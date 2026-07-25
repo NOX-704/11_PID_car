@@ -68,7 +68,10 @@
                     "${env:MSPM0_SDK_ROOT}/source"
                 ],
                 "limitSymbolsToIncludedHeaders": true
-            }
+            },
+            "compileCommands": [
+                "${workspaceFolder}/Debug/.clangd/compile_commands.json"
+            ]
         }
     ],
     "version": 4
