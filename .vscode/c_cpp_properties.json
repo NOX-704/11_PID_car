@@ -1,21 +1,21 @@
 {
     "configurations": [
         {
-            "name": "MSPM0G3507_Config",
+            "name": "MSPM0G3507-macOS",
             "includePath": [
                 "${workspaceFolder}",
                 "${workspaceFolder}/Debug",
                 "${workspaceFolder}/user_driver",
-                "/Users/rylum/ti/mspm0_sdk_2_10_00_04/source",
-                "/Users/rylum/ti/mspm0_sdk_2_10_00_04/source/third_party/CMSIS/Core/Include",
-                "/Applications/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include",
-                "/Applications/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/include/c"
+                "${env:MSPM0_SDK_ROOT}/source",
+                "${env:MSPM0_SDK_ROOT}/source/third_party/CMSIS/Core/Include",
+                "${env:TI_ARMCLANG_ROOT}/include",
+                "${env:TI_ARMCLANG_ROOT}/include/c"
             ],
             "defines": [
                 "__MSPM0G3507__",
                 "__USE_SYSCONFIG__"
             ],
-            "compilerPath": "/Applications/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm_5.1.1.LTS/bin/tiarmclang",
+            "compilerPath": "${env:TI_ARMCLANG_ROOT}/bin/tiarmclang",
             "compilerArgs": [
                 "-mcpu=cortex-m0plus",
                 "-march=thumbv6m",
@@ -30,7 +30,42 @@
                     "${workspaceFolder}",
                     "${workspaceFolder}/Debug",
                     "${workspaceFolder}/user_driver",
-                    "/Users/rylum/ti/mspm0_sdk_2_10_00_04/source"
+                    "${env:MSPM0_SDK_ROOT}/source"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        },
+        {
+            "name": "MSPM0G3507-Windows",
+            "includePath": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/Debug",
+                "${workspaceFolder}/user_driver",
+                "${env:MSPM0_SDK_ROOT}/source",
+                "${env:MSPM0_SDK_ROOT}/source/third_party/CMSIS/Core/Include",
+                "${env:TI_ARMCLANG_ROOT}/include",
+                "${env:TI_ARMCLANG_ROOT}/include/c"
+            ],
+            "defines": [
+                "__MSPM0G3507__",
+                "__USE_SYSCONFIG__"
+            ],
+            "compilerPath": "${env:TI_ARMCLANG_ROOT}/bin/tiarmclang.exe",
+            "compilerArgs": [
+                "-mcpu=cortex-m0plus",
+                "-march=thumbv6m",
+                "-mthumb",
+                "-mfloat-abi=soft"
+            ],
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "windows-clang-arm",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}",
+                    "${workspaceFolder}/Debug",
+                    "${workspaceFolder}/user_driver",
+                    "${env:MSPM0_SDK_ROOT}/source"
                 ],
                 "limitSymbolsToIncludedHeaders": true
             }
