@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "MSPM0G3507-macOS",
+            "name": "Mac",
             "includePath": [
                 "${workspaceFolder}",
                 "${workspaceFolder}/Debug",
@@ -36,7 +36,7 @@
             }
         },
         {
-            "name": "MSPM0G3507-Windows",
+            "name": "Win32",
             "includePath": [
                 "${workspaceFolder}",
                 "${workspaceFolder}/Debug",
@@ -68,10 +68,7 @@
                     "${env:MSPM0_SDK_ROOT}/source"
                 ],
                 "limitSymbolsToIncludedHeaders": true
-            },
-            "compileCommands": [
-                "${workspaceFolder}/Debug/.clangd/compile_commands.json"
-            ]
+            }
         }
     ],
     "version": 4
