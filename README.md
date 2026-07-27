@@ -31,7 +31,7 @@
 | 舵机 PWM | 仅初始化 | PA27、50 Hz，启动时比较值为 `50`，没有动态控制 |
 | LED0/LED1 | 仅配置 | PA14/PA15，当前没有运行时控制 |
 | 按键 | 已移除 | PB6/PB7 已让给循迹输入，当前没有开始/停止按键 |
-| 干净重生成与编译 | 当前未通过 | 详见“构建与验证”中的两个旧宏问题 |
+| 干净重生成、编译与链接 | 已通过 | 2026-07-27 使用 `make check` 和 CCS Debug 构建验证通过 |
 
 程序初始化后会立即启动 10 ms 电机控制定时器，没有独立的开始/停止状态机。首次上电调试必须架空车轮。
 
@@ -250,6 +250,16 @@ $CompilerRoot = "D:\ti\ccs2050\ccs\tools\compiler\ti-cgt-armllvm_4.0.4.LTS"
 
 ## 构建与验证
 
+### macOS 命令行检查
+
+在工程根目录执行：
+
+```bash
+make check
+```
+
+该命令会依次重新生成 SysConfig、检查代码依赖的关键宏，并使用 TI ArmClang 对 `main.c`、全部 `user_driver/*.c` 和生成的 `ti_msp_dl_config.c` 进行对象编译。检查产物写入 `/tmp/11_PID_car_check`，不会覆盖 CCS 的 `Debug/`。
+
 ### CCS Theia
 
 1. 安装 MSPM0 SDK 2.10.00.04 和 SysConfig 1.26.2。
@@ -260,19 +270,25 @@ $CompilerRoot = "D:\ti\ccs2050\ccs\tools\compiler\ti-cgt-armllvm_4.0.4.LTS"
 
 不要把仓库中的历史 `Debug/ti_msp_dl_config.h` 当作干净生成结果。
 
+若需要从 macOS 终端复现 CCS 的完整 Debug 构建，应使用 CCS 自带的 GNU Make，例如：
+
+```bash
+/Applications/ti/ccs2100/ccs/utils/bin/gmake -C Debug all
+```
+
+macOS 系统自带的 GNU Make 3.81 不支持 CCS 生成文件使用的 `-Onone` 参数；直接运行 `make -C Debug all` 会在递归构建处报错。CCS IDE 的 Build 按钮会使用其自带版本，不受此问题影响。
+
 ### 当前验证结果
 
 2026-07-27 在 macOS 上使用 MSPM0 SDK 2.10.00.04、SysConfig 1.26.2 和 TI ArmClang 5.1.1.LTS 检查：
 
 - 当前 `empty.syscfg` 的 SysConfig 生成成功，确认 I2C1 已删除，8 路 `XUNJI` GPIO 可以生成。
-- 直接运行 `make check` 会在宏检查阶段失败，因为 `Makefile` 仍要求旧 I2C 宏 `HUIDU_INST`。
-- 临时把宏检查项改成 `XUNJI_*` 后，编译 `main.c` 又会失败：源码使用历史生成宏 `GPIO_MULTIPLE_GPIOB_INT_IRQN`，而当前 SysConfig 实际生成的是 `DC_MOTOR_INT_IRQN`。
+- `main.c` 使用当前生成的 `DC_MOTOR_INT_IRQN` 启用编码器 GPIOB 中断。
+- `Makefile` 已检查 `DC_MOTOR_INT_IRQN` 和全部 `XUNJI_L1~R4` 端口/引脚宏，不再依赖旧 I2C 宏 `HUIDU_INST`。
+- `main.c`、全部 `user_driver/*.c` 和生成的 `ti_msp_dl_config.c` 对象编译均为 0 报错。
+- 使用 CCS 自带 GNU Make 和本机解析到的 TI ArmClang 4.0.2.LTS 完成 Debug 链接，成功生成 `Debug/11_PID_car.out`。
 
-因此，当前提交不能声明“干净重生成和对象编译均通过”。仓库里的历史 `Debug` 文件含有旧的兼容宏，可能掩盖这个问题。后续修复时应同步：
-
-1. 把 `main.c` 的 GPIOB 中断 IRQ 宏改为当前 SysConfig 生成的 `DC_MOTOR_INT_IRQN`。
-2. 把 `Makefile` 的 `HUIDU_INST` 检查替换为实际使用的 `XUNJI_L1~R4` 端口/引脚宏。
-3. 重新执行 SysConfig 生成、关键宏检查和所有 `.c` 文件对象编译，全部 0 报错后再烧录。
+以上结果证明当前工程能够干净生成 SysConfig、通过对象编译并完成 Debug 链接，但不等同于烧录或实车功能验证。烧录前仍应在当前电脑上重新执行一次检查。
 
 ## 串口调试输出
 
@@ -307,7 +323,7 @@ $CompilerRoot = "D:\ti\ccs2050\ccs\tools\compiler\ti-cgt-armllvm_4.0.4.LTS"
 
 ## 已知限制
 
-- 当前干净编译被两个旧宏问题阻塞，不能仅凭仓库中的 `.out` 或历史 `Debug` 文件判断工程可重新构建。
+- `make check` 只验证 SysConfig、宏和对象编译，不执行完整链接、烧录或实车功能测试。
 - 循迹模块的具体型号、供电范围以及黑/白对应电平没有记录，必须实测校准。
 - 循迹使用离散规则而不是连续误差算法；多探头同时命中时，结果依赖 `if/else if` 顺序。
 - 两路全 `0` 或全 `1` 都会把目标速度设为 `0`。

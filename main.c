@@ -48,7 +48,8 @@ int main(void)
     SYSCFG_DL_init();
     // NVIC_EnableIRQ(PRINT_INST_INT_IRQN);
     // NVIC_EnableIRQ(KEY_INT_IRQN);
-    NVIC_EnableIRQ(GPIO_MULTIPLE_GPIOB_INT_IRQN);
+    /* 启用 DC_MOTOR GPIOB 中断，用于统计两路编码器 A 相上升沿。 */
+    NVIC_EnableIRQ(DC_MOTOR_INT_IRQN);
     DL_ADC12_enableConversions(xuanniu_INST);
     DL_Timer_startCounter(SERVO_INST);
     DL_Timer_setCaptureCompareValue(SERVO_INST, 50, GPIO_SERVO_C1_IDX);
