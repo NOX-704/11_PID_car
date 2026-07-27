@@ -47,7 +47,10 @@ int main(void)
     SYSCFG_DL_init();
     // NVIC_EnableIRQ(PRINT_INST_INT_IRQN);
     // NVIC_EnableIRQ(KEY_INT_IRQN);
+<<<<<<< Updated upstream
     /* 启用 DC_MOTOR GPIOB 中断，用于统计两路编码器 A 相上升沿。 */
+=======
+>>>>>>> Stashed changes
     NVIC_EnableIRQ(DC_MOTOR_INT_IRQN);
     DL_ADC12_enableConversions(xuanniu_INST);
     DL_Timer_startCounter(SERVO_INST);
