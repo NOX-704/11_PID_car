@@ -4,24 +4,15 @@
 #include "ti_msp_dl_config.h"
 
 /*
- * 继续使用当前已验证的差速参数：直行/内侧通道为 150，黑带越靠外，
- * 外侧通道依次提高到 250、300、350、400。
+ * 使用当前实车调整后的差速参数：直行为 200、内侧通道为 150，
+ * 黑带越靠外，外侧通道依次提高到 220、260、320、420。
  */
-#define TRACK_STRAIGHT_SPEED (150.0f)
+#define TRACK_STRAIGHT_SPEED (200.0f)
 #define TRACK_INNER_SPEED    (150.0f)
-#define TRACK_OUTER_SPEED_1  (250.0f)
-#define TRACK_OUTER_SPEED_2  (300.0f)
-#define TRACK_OUTER_SPEED_3  (350.0f)
-#define TRACK_OUTER_SPEED_4  (400.0f)
-
-/*
- * TIMA0 每 10 ms 调用一次 adjust_motor()。目标轮速用 20 个控制周期
- * 完成一次线性过渡，使速度 PID 的 PWM 输入不再发生阶梯突变。
- */
-#define TRACK_CONTROL_PERIOD_MS  (10U)
-#define TRACK_RAMP_DURATION_MS   (200U)
-#define TRACK_RAMP_TICKS         \
-    (TRACK_RAMP_DURATION_MS / TRACK_CONTROL_PERIOD_MS)
+#define TRACK_OUTER_SPEED_1  (220.0f)
+#define TRACK_OUTER_SPEED_2  (260.0f)
+#define TRACK_OUTER_SPEED_3  (320.0f)
+#define TRACK_OUTER_SPEED_4  (420.0f)
 
 /*
  * 第 3、4 档表示黑带已经明显偏到外侧。此时若下一帧八路全亮，
@@ -50,13 +41,6 @@ extern float target_speed_2;
 static float s_last_command_speed_1 = TRACK_STRAIGHT_SPEED;
 static float s_last_command_speed_2 = TRACK_STRAIGHT_SPEED;
 static uint8_t s_last_offset_level = 0U;
-
-/* 目标轮速斜坡的起点、终点和当前进度，由 10 ms 控制中断独占访问。 */
-static float s_ramp_start_speed_1 = 0.0f;
-static float s_ramp_start_speed_2 = 0.0f;
-static float s_ramp_end_speed_1 = 0.0f;
-static float s_ramp_end_speed_2 = 0.0f;
-static uint8_t s_ramp_tick = TRACK_RAMP_TICKS;
 
 /**
  * 读取单路循迹 GPIO，并转换为与物理指示灯一致的逻辑值。
@@ -108,45 +92,10 @@ static float huidu_get_outer_speed(uint8_t offset_level)
 }
 
 /**
- * 在 200 ms 内把两路目标轮速从当前值线性过渡到新指令。
+ * 保存本次有效循迹决策，并立即更新速度 PID 的目标轮速。
  *
- * 这里平滑的是速度 PID 的目标值，而不是绕过 PID 直接改 PWM。
- * 因此编码器闭环仍然有效，同时 PWM 不会因差速档位切换产生阶跃。
- */
-static void huidu_apply_speed_ramp(
-    float command_speed_1, float command_speed_2)
-{
-    float progress;
-
-    /*
-     * 指令变化时从当前已经输出的目标轮速重新起步。即使传感器连续
-     * 跨越多个档位，也不会突然跳到新档位。
-     */
-    if ((command_speed_1 != s_ramp_end_speed_1) ||
-        (command_speed_2 != s_ramp_end_speed_2)) {
-        s_ramp_start_speed_1 = target_speed_1;
-        s_ramp_start_speed_2 = target_speed_2;
-        s_ramp_end_speed_1 = command_speed_1;
-        s_ramp_end_speed_2 = command_speed_2;
-        s_ramp_tick = 0U;
-    }
-
-    if (s_ramp_tick < TRACK_RAMP_TICKS) {
-        s_ramp_tick++;
-        progress = (float) s_ramp_tick / (float) TRACK_RAMP_TICKS;
-        target_speed_1 = s_ramp_start_speed_1 +
-            (s_ramp_end_speed_1 - s_ramp_start_speed_1) * progress;
-        target_speed_2 = s_ramp_start_speed_2 +
-            (s_ramp_end_speed_2 - s_ramp_start_speed_2) * progress;
-    } else {
-        /* 消除浮点插值尾差，完成后固定为准确的档位目标值。 */
-        target_speed_1 = s_ramp_end_speed_1;
-        target_speed_2 = s_ramp_end_speed_2;
-    }
-}
-
-/**
- * 保存本次有效循迹决策，并通过 200 ms 斜坡更新 PID 目标轮速。
+ * 目标轮速不能再做 200 ms 插值，否则最外档只短暂出现时，PID 看到的
+ * 差速仍然很小。PWM 的 200 ms 平滑改由 motor.c 在实际输出层完成。
  */
 static void huidu_set_command(
     float command_speed_1, float command_speed_2, uint8_t offset_level)
@@ -154,7 +103,8 @@ static void huidu_set_command(
     s_last_command_speed_1 = command_speed_1;
     s_last_command_speed_2 = command_speed_2;
     s_last_offset_level = offset_level;
-    huidu_apply_speed_ramp(command_speed_1, command_speed_2);
+    target_speed_1 = command_speed_1;
+    target_speed_2 = command_speed_2;
 }
 
 /**
@@ -215,8 +165,8 @@ void adjust_motor(void)
      */
     if (unlit_count == 0U) {
         if (s_last_offset_level >= TRACK_LARGE_OFFSET_LEVEL) {
-            huidu_apply_speed_ramp(
-                s_last_command_speed_1, s_last_command_speed_2);
+            target_speed_1 = s_last_command_speed_1;
+            target_speed_2 = s_last_command_speed_2;
         } else {
             huidu_set_command(
                 TRACK_STRAIGHT_SPEED, TRACK_STRAIGHT_SPEED, 0U);

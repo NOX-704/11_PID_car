@@ -1,6 +1,14 @@
 #include "motor.h"
 #include "huidu.h"
 
+/*
+ * 电机 PWM 周期为 4000，控制中断周期为 10 ms。
+ * 每次最多改变 200；持续请求满量程时，从 0 到 4000 需要 20 次，
+ * 即 200 ms。较小的 PWM 变化会按相同斜率更早完成。
+ */
+#define MOTOR_PWM_MAX_DUTY  (4000)
+#define MOTOR_PWM_RAMP_STEP (200)
+
 void motor_init(uint8_t motor_id)
 {
     if(motor_id == 1 || motor_id == 3){
@@ -22,14 +30,31 @@ void motor_init(uint8_t motor_id)
 // 限幅函数
 int limit_duty(int duty)
 {
-    if(duty > 4000){
-        duty = 4000;
+    if(duty > MOTOR_PWM_MAX_DUTY){
+        duty = MOTOR_PWM_MAX_DUTY;
     }
     if(duty < 0)
     {
         duty = 0;
     }
     return duty;
+}
+
+/**
+ * 限制一次 10 ms 控制周期内的实际 PWM 变化量。
+ *
+ * PID 可以立即看到完整的目标轮速差，但最终写入 TB6612 的 PWM 每次
+ * 最多变化 200。这样最外档差速能及时建立，同时避免 PWM 阶跃抖动。
+ */
+static int motor_ramp_duty(int current_duty, int requested_duty)
+{
+    if (requested_duty > current_duty + MOTOR_PWM_RAMP_STEP) {
+        return current_duty + MOTOR_PWM_RAMP_STEP;
+    }
+    if (requested_duty < current_duty - MOTOR_PWM_RAMP_STEP) {
+        return current_duty - MOTOR_PWM_RAMP_STEP;
+    }
+    return requested_duty;
 }
 
 void motor_set_duty(uint8_t motor_id, uint32_t duty)
@@ -115,24 +140,29 @@ float prev_error_2 = 0;
 void DC_MOTOR_PID(uint8_t motor_id)
 {
     float error;
+    int pid_delta;
+    int requested_duty;
+
     if (motor_id == 1) {
         error = target_speed_1 - speed_1;
-        PWM_1_duty += (int)(kp * (error - last_error_1)
-                         + ki * error
-                         + kd * (error - 2 * last_error_1 + prev_error_1));
+        pid_delta = (int)(kp * (error - last_error_1)
+                        + ki * error
+                        + kd * (error - 2 * last_error_1 + prev_error_1));
         prev_error_1 = last_error_1;
         last_error_1 = error;
-        PWM_1_duty = limit_duty(PWM_1_duty);
+        requested_duty = limit_duty(PWM_1_duty + pid_delta);
+        PWM_1_duty = motor_ramp_duty(PWM_1_duty, requested_duty);
         motor_set_duty(motor_id, PWM_1_duty);
     }
     if (motor_id == 2) {
         error = target_speed_2 - speed_2;
-        PWM_2_duty += (int)(kp * (error - last_error_2)
-                         + ki * error
-                         + kd * (error - 2 * last_error_2 + prev_error_2));
+        pid_delta = (int)(kp * (error - last_error_2)
+                        + ki * error
+                        + kd * (error - 2 * last_error_2 + prev_error_2));
         prev_error_2 = last_error_2;
         last_error_2 = error;
-        PWM_2_duty = limit_duty(PWM_2_duty);
+        requested_duty = limit_duty(PWM_2_duty + pid_delta);
+        PWM_2_duty = motor_ramp_duty(PWM_2_duty, requested_duty);
         motor_set_duty(motor_id, PWM_2_duty);
     }
 }
@@ -157,4 +187,3 @@ void MOTOR_PID_INST_IRQHandler()
         break;
     }
 }
-
