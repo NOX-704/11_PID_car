@@ -116,7 +116,7 @@ L1  L2  L3  L4  |  R1  R2  R3  R4
 | 黑带在 R4 四档 | `400` | `150` |
 | 8 路全灭，无法判断胶带中心 | `0` | `0` |
 
-电机 A/B 通道分别安装在车体哪一侧没有在仓库中注明，以上差速方向沿用旧工程。如果实车向错误方向修正，应先核对左右轮和电机方向。
+电机 A/B 通道分别安装在车体哪一侧没有在仓库中注明，以上差速方向沿用旧工程。根据 2026-07-27 实车反馈，电机 2 的软件正转极性已经对调：`direction=1` 时 BIN1=低、BIN2=高，使两只电机都朝车辆前进方向转动。
 
 ## 电机测速与 PID
 
@@ -157,11 +157,11 @@ PWM(k) = clamp(PWM(k-1) + ΔPWM, 0, 4000)
 | 外设功能 | 芯片/模块型号 | 地猛星引脚 | IOMUX 索引 | 片上复用功能 | 备注 |
 |---|---|---|---|---|---|
 | 电机 A PWM / PWMA | TB6612FNG | PA12 | PINCM34 | TIMG0_CCP0 | 约 10 kHz |
-| 电机 A 方向 AIN1 | TB6612FNG | PA9 | PINCM20 | GPIO 输出 | 以 SysConfig 宏命名为准 |
-| 电机 A 方向 AIN2 | TB6612FNG | PA8 | PINCM19 | GPIO 输出 | 以 SysConfig 宏命名为准 |
+| 电机 A 方向 AIN1 | TB6612FNG | PA9 | PINCM20 | GPIO 输出 | 软件正转时为低电平 |
+| 电机 A 方向 AIN2 | TB6612FNG | PA8 | PINCM19 | GPIO 输出 | 软件正转时为高电平 |
 | 电机 B PWM / PWMB | TB6612FNG | PA13 | PINCM35 | TIMG0_CCP1 | 约 10 kHz |
-| 电机 B 方向 BIN1 | TB6612FNG | PA7 | PINCM14 | GPIO 输出 | 以 SysConfig 宏命名为准 |
-| 电机 B 方向 BIN2 | TB6612FNG | PB18 | PINCM44 | GPIO 输出 | 以 SysConfig 宏命名为准 |
+| 电机 B 方向 BIN1 | TB6612FNG | PA7 | PINCM14 | GPIO 输出 | 软件正转时为低电平 |
+| 电机 B 方向 BIN2 | TB6612FNG | PB18 | PINCM44 | GPIO 输出 | 软件正转时为高电平 |
 | 电机驱动使能 STBY | TB6612FNG | PB24 | PINCM52 | GPIO 输出 | A/B 通道共用 |
 | 电机 A 编码器 A 相 | 带编码器直流电机，具体型号未注明 | PB8 | PINCM25 | GPIO 输入/上升沿中断 | 参与计数 |
 | 电机 A 编码器 B 相 | 同上 | PB9 | PINCM26 | GPIO 输入 | 当前未参与方向判断 |

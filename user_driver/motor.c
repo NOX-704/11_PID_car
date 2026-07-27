@@ -43,7 +43,10 @@ void motor_set_duty(uint8_t motor_id, uint32_t duty)
     }
 }
 
-// direction: 0 停止，1 正转，2 反转
+/*
+ * direction: 0=停止，1=车辆前进方向，2=车辆后退方向。
+ * 电机 2 在实车上的安装极性与旧代码相反，因此其正转电平在此处对调。
+ */
 void motor_set_direction(uint8_t motor_id, uint8_t direction)
 {
     if(motor_id == 1){
@@ -66,12 +69,12 @@ void motor_set_direction(uint8_t motor_id, uint8_t direction)
             DL_GPIO_setPins(DC_MOTOR_BIN2_PORT, DC_MOTOR_BIN2_PIN);
         }
         else if(direction == 1){
-            DL_GPIO_setPins(DC_MOTOR_BIN1_PORT, DC_MOTOR_BIN1_PIN);
-            DL_GPIO_clearPins(DC_MOTOR_BIN2_PORT, DC_MOTOR_BIN2_PIN);
-        }
-        else if(direction == 2){
             DL_GPIO_clearPins(DC_MOTOR_BIN1_PORT, DC_MOTOR_BIN1_PIN);
             DL_GPIO_setPins(DC_MOTOR_BIN2_PORT, DC_MOTOR_BIN2_PIN);
+        }
+        else if(direction == 2){
+            DL_GPIO_setPins(DC_MOTOR_BIN1_PORT, DC_MOTOR_BIN1_PIN);
+            DL_GPIO_clearPins(DC_MOTOR_BIN2_PORT, DC_MOTOR_BIN2_PIN);
         }
     }
 }
@@ -154,5 +157,4 @@ void MOTOR_PID_INST_IRQHandler()
         break;
     }
 }
-
 
