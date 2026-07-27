@@ -3,16 +3,13 @@
 #include "motor.h"
 #include "ti_msp_dl_config.h"
 
-/*
- * 继续使用旧版差速参数：直行/内侧通道为 150，黑带越靠外，
- * 外侧通道依次提高到 250、300、350、400。
- */
-#define TRACK_STRAIGHT_SPEED (150.0f)
-#define TRACK_INNER_SPEED    (150.0f)
-#define TRACK_OUTER_SPEED_1  (250.0f)
-#define TRACK_OUTER_SPEED_2  (300.0f)
-#define TRACK_OUTER_SPEED_3  (350.0f)
-#define TRACK_OUTER_SPEED_4  (400.0f)
+
+#define TRACK_STRAIGHT_SPEED (280.0f)
+#define TRACK_INNER_SPEED    (140.0f)
+#define TRACK_OUTER_SPEED_1  (160.0f)
+#define TRACK_OUTER_SPEED_2  (280.0f)
+#define TRACK_OUTER_SPEED_3  (300.0f)
+#define TRACK_OUTER_SPEED_4  (320.0f)
 
 /*
  * 权重以 L4/R1 之间的车体中心为零点。
@@ -149,10 +146,10 @@ void adjust_motor(void)
      * 黑带偏左时通道 1 慢、通道 2 快；偏右时反向分配。
      */
     if (weighted_error < 0) {
-        target_speed_1 = TRACK_INNER_SPEED;
-        target_speed_2 = outer_speed;
-    } else {
         target_speed_1 = outer_speed;
         target_speed_2 = TRACK_INNER_SPEED;
+    } else {
+        target_speed_1 = TRACK_INNER_SPEED;
+        target_speed_2 = outer_speed;
     }
 }

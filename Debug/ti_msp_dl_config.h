@@ -129,34 +129,6 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 
 
 
-
-/* Defines for XUNJI */
-#define XUNJI_L1_PORT                                                       GPIOB
-#define XUNJI_L1_PIN                                                DL_GPIO_PIN_6
-#define XUNJI_L1_IOMUX                                             (IOMUX_PINCM23)
-#define XUNJI_L2_PORT                                                       GPIOB
-#define XUNJI_L2_PIN                                                DL_GPIO_PIN_7
-#define XUNJI_L2_IOMUX                                             (IOMUX_PINCM24)
-#define XUNJI_L3_PORT                                                       GPIOA
-#define XUNJI_L3_PIN                                               DL_GPIO_PIN_17
-#define XUNJI_L3_IOMUX                                             (IOMUX_PINCM39)
-#define XUNJI_L4_PORT                                                       GPIOA
-#define XUNJI_L4_PIN                                               DL_GPIO_PIN_18
-#define XUNJI_L4_IOMUX                                             (IOMUX_PINCM40)
-#define XUNJI_R1_PORT                                                       GPIOA
-#define XUNJI_R1_PIN                                               DL_GPIO_PIN_21
-#define XUNJI_R1_IOMUX                                             (IOMUX_PINCM43)
-#define XUNJI_R2_PORT                                                       GPIOA
-#define XUNJI_R2_PIN                                               DL_GPIO_PIN_22
-#define XUNJI_R2_IOMUX                                             (IOMUX_PINCM46)
-#define XUNJI_R3_PORT                                                       GPIOA
-#define XUNJI_R3_PIN                                               DL_GPIO_PIN_24
-#define XUNJI_R3_IOMUX                                             (IOMUX_PINCM50)
-#define XUNJI_R4_PORT                                                       GPIOA
-#define XUNJI_R4_PIN                                               DL_GPIO_PIN_25
-#define XUNJI_R4_IOMUX                                             (IOMUX_PINCM51)
-
-
 /* Defines for DEBUG */
 #define DEBUG_INST                                                         UART0
 #define DEBUG_INST_FREQUENCY                                            40000000
@@ -206,11 +178,6 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for LED1: GPIOA.15 with pinCMx 37 on package pin 8 */
 #define LED_LED1_PIN                                            (DL_GPIO_PIN_15)
 #define LED_LED1_IOMUX                                           (IOMUX_PINCM37)
-
-/* Interrupt defines for GPIOB (encoder inputs) */
-#define GPIO_MULTIPLE_GPIOB_INT_IRQN                            (GPIOB_INT_IRQn)
-#define GPIO_MULTIPLE_GPIOB_INT_IIDX            (DL_INTERRUPT_GROUP1_IIDX_GPIOB)
-
 /* Defines for AIN2: GPIOA.8 with pinCMx 19 on package pin 54 */
 #define DC_MOTOR_AIN2_PORT                                               (GPIOA)
 #define DC_MOTOR_AIN2_PIN                                        (DL_GPIO_PIN_8)
@@ -225,6 +192,9 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define DC_MOTOR_STBY_IOMUX                                      (IOMUX_PINCM52)
 /* Defines for AA: GPIOB.8 with pinCMx 25 on package pin 60 */
 #define DC_MOTOR_AA_PORT                                                 (GPIOB)
+// pins affected by this interrupt request:["AA","BA"]
+#define DC_MOTOR_INT_IRQN                                       (GPIOB_INT_IRQn)
+#define DC_MOTOR_INT_IIDX                       (DL_INTERRUPT_GROUP1_IIDX_GPIOB)
 #define DC_MOTOR_AA_IIDX                                     (DL_GPIO_IIDX_DIO8)
 #define DC_MOTOR_AA_PIN                                          (DL_GPIO_PIN_8)
 #define DC_MOTOR_AA_IOMUX                                        (IOMUX_PINCM25)
@@ -249,6 +219,38 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define DC_MOTOR_BB_PORT                                                 (GPIOB)
 #define DC_MOTOR_BB_PIN                                         (DL_GPIO_PIN_20)
 #define DC_MOTOR_BB_IOMUX                                        (IOMUX_PINCM48)
+/* Defines for L1: GPIOB.6 with pinCMx 23 on package pin 58 */
+#define XUNJI_L1_PORT                                                    (GPIOB)
+#define XUNJI_L1_PIN                                             (DL_GPIO_PIN_6)
+#define XUNJI_L1_IOMUX                                           (IOMUX_PINCM23)
+/* Defines for L2: GPIOB.7 with pinCMx 24 on package pin 59 */
+#define XUNJI_L2_PORT                                                    (GPIOB)
+#define XUNJI_L2_PIN                                             (DL_GPIO_PIN_7)
+#define XUNJI_L2_IOMUX                                           (IOMUX_PINCM24)
+/* Defines for L3: GPIOA.17 with pinCMx 39 on package pin 10 */
+#define XUNJI_L3_PORT                                                    (GPIOA)
+#define XUNJI_L3_PIN                                            (DL_GPIO_PIN_17)
+#define XUNJI_L3_IOMUX                                           (IOMUX_PINCM39)
+/* Defines for L4: GPIOA.18 with pinCMx 40 on package pin 11 */
+#define XUNJI_L4_PORT                                                    (GPIOA)
+#define XUNJI_L4_PIN                                            (DL_GPIO_PIN_18)
+#define XUNJI_L4_IOMUX                                           (IOMUX_PINCM40)
+/* Defines for R1: GPIOA.21 with pinCMx 46 on package pin 17 */
+#define XUNJI_R1_PORT                                                    (GPIOA)
+#define XUNJI_R1_PIN                                            (DL_GPIO_PIN_21)
+#define XUNJI_R1_IOMUX                                           (IOMUX_PINCM46)
+/* Defines for R2: GPIOA.22 with pinCMx 47 on package pin 18 */
+#define XUNJI_R2_PORT                                                    (GPIOA)
+#define XUNJI_R2_PIN                                            (DL_GPIO_PIN_22)
+#define XUNJI_R2_IOMUX                                           (IOMUX_PINCM47)
+/* Defines for R3: GPIOA.24 with pinCMx 54 on package pin 25 */
+#define XUNJI_R3_PORT                                                    (GPIOA)
+#define XUNJI_R3_PIN                                            (DL_GPIO_PIN_24)
+#define XUNJI_R3_IOMUX                                           (IOMUX_PINCM54)
+/* Defines for R4: GPIOA.25 with pinCMx 55 on package pin 26 */
+#define XUNJI_R4_PORT                                                    (GPIOA)
+#define XUNJI_R4_PIN                                            (DL_GPIO_PIN_25)
+#define XUNJI_R4_IOMUX                                           (IOMUX_PINCM55)
 
 
 /* clang-format on */
