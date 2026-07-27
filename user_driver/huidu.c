@@ -145,14 +145,14 @@ void adjust_motor(void)
         unlit_count);
 
     /*
-     * 延续旧工程的电机通道差速方向：
-     * 黑带偏左时通道 1 慢、通道 2 快；偏右时反向分配。
+     * 实车已确认：通道 1/A 是右轮，通道 2/B 是左轮。
+     * 黑带偏左时左轮减速、右轮加速；黑带偏右时反向分配。
      */
     if (weighted_error < 0) {
-        target_speed_1 = TRACK_INNER_SPEED;
-        target_speed_2 = outer_speed;
-    } else {
         target_speed_1 = outer_speed;
         target_speed_2 = TRACK_INNER_SPEED;
+    } else {
+        target_speed_1 = TRACK_INNER_SPEED;
+        target_speed_2 = outer_speed;
     }
 }
