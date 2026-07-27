@@ -4,19 +4,17 @@ uint8_t huidu_value[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 void huidu_get_value()
 {
-    uint8_t cmd = 0x30;
     uint8_t data = 0;
-    uint32_t timeout;
 
-    DL_I2C_fillControllerTXFIFO(HUIDU_INST, &cmd, 1);
-    DL_I2C_startControllerTransfer(HUIDU_INST, HUIDU8_I2C_ADDR, DL_I2C_CONTROLLER_DIRECTION_TX, 1);
-    timeout = 100000;
-    while ((DL_I2C_getControllerStatus(HUIDU_INST) & DL_I2C_CONTROLLER_STATUS_BUSY_BUS) && --timeout) {}
+    if (DL_GPIO_readPins(XUNJI_L1_PORT, XUNJI_L1_PIN) & XUNJI_L1_PIN) data |= (1 << 0);
+    if (DL_GPIO_readPins(XUNJI_L2_PORT, XUNJI_L2_PIN) & XUNJI_L2_PIN) data |= (1 << 1);
+    if (DL_GPIO_readPins(XUNJI_L3_PORT, XUNJI_L3_PIN) & XUNJI_L3_PIN) data |= (1 << 2);
+    if (DL_GPIO_readPins(XUNJI_L4_PORT, XUNJI_L4_PIN) & XUNJI_L4_PIN) data |= (1 << 3);
+    if (DL_GPIO_readPins(XUNJI_R1_PORT, XUNJI_R1_PIN) & XUNJI_R1_PIN) data |= (1 << 4);
+    if (DL_GPIO_readPins(XUNJI_R2_PORT, XUNJI_R2_PIN) & XUNJI_R2_PIN) data |= (1 << 5);
+    if (DL_GPIO_readPins(XUNJI_R3_PORT, XUNJI_R3_PIN) & XUNJI_R3_PIN) data |= (1 << 6);
+    if (DL_GPIO_readPins(XUNJI_R4_PORT, XUNJI_R4_PIN) & XUNJI_R4_PIN) data |= (1 << 7);
 
-    DL_I2C_startControllerTransfer(HUIDU_INST, HUIDU8_I2C_ADDR, DL_I2C_CONTROLLER_DIRECTION_RX, 1);
-    timeout = 100000;
-    while ((DL_I2C_getControllerStatus(HUIDU_INST) & DL_I2C_CONTROLLER_STATUS_BUSY_BUS) && --timeout) {}
-    data = DL_I2C_receiveControllerData(HUIDU_INST);
     data = ~data;
 
     huidu_value[0] = (data >> 0) & 0x01;
@@ -43,11 +41,8 @@ void adjust_motor()
     if (v[0] == 0 && v[1] == 0 && v[2] == 0 && v[3] == 0
         && v[4] == 0 && v[5] == 0 && v[6] == 0 && v[7] == 0)
     {
-        motor_set_direction(1, 1);
-        motor_set_direction(2, 1);
-        float min_speed = target_speed_1 < target_speed_2 ? target_speed_1 : target_speed_2;
-        target_speed_1 = min_speed;
-        target_speed_2 = min_speed;
+        target_speed_1 = 0;
+        target_speed_2 = 0;
     }
     else if (v[0] == 1 && v[1] == 1 && v[2] == 1 && v[3] == 1
         && v[4] == 1 && v[5] == 1 && v[6] == 1 && v[7] == 1)
@@ -55,56 +50,51 @@ void adjust_motor()
         target_speed_1 = 0;
         target_speed_2 = 0;
     }
-    else if ((v[3] == 1 || v[4] == 1)
+    else if (v[3] == 1 && v[4] == 1
         && v[0] == 0 && v[1] == 0 && v[2] == 0
         && v[5] == 0 && v[6] == 0 && v[7] == 0)
     {
-        motor_set_direction(1, 1);
-        motor_set_direction(2, 1);
-        float min_speed = target_speed_1 < target_speed_2 ? target_speed_1 : target_speed_2;
-        target_speed_1 = min_speed;
-        target_speed_2 = min_speed;
+        target_speed_1 = MIN_SPEED;
+        target_speed_2 = MIN_SPEED;
     }
-    // 左侧传感器: S3(近中心) > S2 > S1 > S0(最左)，从近到远检查
     else if (v[3] == 1 && v[0] == 0 && v[1] == 0 && v[2] == 0)
     {
-        target_speed_1 = 275;
-        target_speed_2 = 400;
+        target_speed_1 = MIN_SPEED;
+        target_speed_2 = 250;
     }
     else if (v[2] == 1 && v[0] == 0 && v[1] == 0)
     {
-        target_speed_1 = 250;
-        target_speed_2 = 400;
+        target_speed_1 = MIN_SPEED;
+        target_speed_2 = 300;
     }
     else if (v[1] == 1 && v[0] == 0)
     {
-        target_speed_1 = 225;
-        target_speed_2 = 400;
+        target_speed_1 = MIN_SPEED;
+        target_speed_2 = 350;
     }
     else if (v[0] == 1)
     {
-        target_speed_1 = 200;
+        target_speed_1 = MIN_SPEED;
         target_speed_2 = 400;
     }
-    // 右侧传感器: S4(近中心) > S5 > S6 > S7(最右)，从近到远检查
     else if (v[4] == 1 && v[5] == 0 && v[6] == 0 && v[7] == 0)
     {
-        target_speed_1 = 400;
-        target_speed_2 = 275;
+        target_speed_1 = 250;
+        target_speed_2 = MIN_SPEED;
     }
     else if (v[5] == 1 && v[6] == 0 && v[7] == 0)
     {
-        target_speed_1 = 400;
-        target_speed_2 = 225;
+        target_speed_1 = 300;
+        target_speed_2 = MIN_SPEED;
     }
     else if (v[6] == 1 && v[7] == 0)
     {
-        target_speed_1 = 400;
-        target_speed_2 = 200;
+        target_speed_1 = 350;
+        target_speed_2 = MIN_SPEED;
     }
     else if (v[7] == 1)
     {
         target_speed_1 = 400;
-        target_speed_2 = 200;
+        target_speed_2 = MIN_SPEED;
     }
 }

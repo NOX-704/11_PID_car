@@ -56,7 +56,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_SERVO_init();
     SYSCFG_DL_PWMAB_init();
     SYSCFG_DL_MOTOR_PID_init();
-    SYSCFG_DL_HUIDU_init();
     SYSCFG_DL_DEBUG_init();
     SYSCFG_DL_xuanniu_init();
     SYSCFG_DL_VREF_init();
@@ -98,7 +97,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_TimerG_reset(SERVO_INST);
     DL_TimerG_reset(PWMAB_INST);
     DL_TimerA_reset(MOTOR_PID_INST);
-    DL_I2C_reset(HUIDU_INST);
     DL_UART_Main_reset(DEBUG_INST);
     DL_ADC12_reset(xuanniu_INST);
     DL_VREF_reset(VREF);
@@ -108,7 +106,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_TimerG_enablePower(SERVO_INST);
     DL_TimerG_enablePower(PWMAB_INST);
     DL_TimerA_enablePower(MOTOR_PID_INST);
-    DL_I2C_enablePower(HUIDU_INST);
     DL_UART_Main_enablePower(DEBUG_INST);
     DL_ADC12_enablePower(xuanniu_INST);
     DL_VREF_enablePower(VREF);
@@ -128,17 +125,37 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_initPeripheralOutputFunction(GPIO_PWMAB_C1_IOMUX,GPIO_PWMAB_C1_IOMUX_FUNC);
     DL_GPIO_enableOutput(GPIO_PWMAB_C1_PORT, GPIO_PWMAB_C1_PIN);
 
-    
-	DL_GPIO_initPeripheralInputFunctionFeatures(
-		 GPIO_HUIDU_IOMUX_SDA, GPIO_HUIDU_IOMUX_SDA_FUNC,
-		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
-		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
-	DL_GPIO_initPeripheralInputFunctionFeatures(
-		 GPIO_HUIDU_IOMUX_SCL, GPIO_HUIDU_IOMUX_SCL_FUNC,
-		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
-		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
-    DL_GPIO_enableHiZ(GPIO_HUIDU_IOMUX_SDA);
-    DL_GPIO_enableHiZ(GPIO_HUIDU_IOMUX_SCL);
+    DL_GPIO_initDigitalInputFeatures(XUNJI_L1_IOMUX,
+         DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
+         DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
+
+    DL_GPIO_initDigitalInputFeatures(XUNJI_L2_IOMUX,
+         DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
+         DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
+
+    DL_GPIO_initDigitalInputFeatures(XUNJI_L3_IOMUX,
+         DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
+         DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
+
+    DL_GPIO_initDigitalInputFeatures(XUNJI_L4_IOMUX,
+         DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
+         DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
+
+    DL_GPIO_initDigitalInputFeatures(XUNJI_R1_IOMUX,
+         DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
+         DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
+
+    DL_GPIO_initDigitalInputFeatures(XUNJI_R2_IOMUX,
+         DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
+         DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
+
+    DL_GPIO_initDigitalInputFeatures(XUNJI_R3_IOMUX,
+         DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
+         DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
+
+    DL_GPIO_initDigitalInputFeatures(XUNJI_R4_IOMUX,
+         DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
+         DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
 
     DL_GPIO_initPeripheralOutputFunction(
         GPIO_DEBUG_IOMUX_TX, GPIO_DEBUG_IOMUX_TX_FUNC);
@@ -148,14 +165,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_initDigitalOutput(LED_LED0_IOMUX);
 
     DL_GPIO_initDigitalOutput(LED_LED1_IOMUX);
-
-    DL_GPIO_initDigitalInputFeatures(KEY_KEY9_IOMUX,
-		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
-		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
-
-    DL_GPIO_initDigitalInputFeatures(KEY_KEY10_IOMUX,
-		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
-		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
 
     DL_GPIO_initDigitalOutput(DC_MOTOR_AIN2_IOMUX);
 
@@ -197,17 +206,11 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		DC_MOTOR_BIN2_PIN);
     DL_GPIO_enableOutput(GPIOB, DC_MOTOR_STBY_PIN |
 		DC_MOTOR_BIN2_PIN);
-    DL_GPIO_setLowerPinsPolarity(GPIOB, DL_GPIO_PIN_6_EDGE_RISE |
-		DL_GPIO_PIN_7_EDGE_RISE |
-		DL_GPIO_PIN_13_EDGE_RISE);
+    DL_GPIO_setLowerPinsPolarity(GPIOB, DL_GPIO_PIN_8_EDGE_RISE);
     DL_GPIO_setUpperPinsPolarity(GPIOB, DL_GPIO_PIN_19_EDGE_RISE);
-    DL_GPIO_clearInterruptStatus(GPIOB, KEY_KEY9_PIN |
-		KEY_KEY10_PIN |
-		DC_MOTOR_AA_PIN |
+    DL_GPIO_clearInterruptStatus(GPIOB, DC_MOTOR_AA_PIN |
 		DC_MOTOR_BA_PIN);
-    DL_GPIO_enableInterrupt(GPIOB, KEY_KEY9_PIN |
-		KEY_KEY10_PIN |
-		DC_MOTOR_AA_PIN |
+    DL_GPIO_enableInterrupt(GPIOB, DC_MOTOR_AA_PIN |
 		DC_MOTOR_BA_PIN);
 
 }
@@ -459,36 +462,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_MOTOR_PID_init(void) {
 
 }
 
-
-static const DL_I2C_ClockConfig gHUIDUClockConfig = {
-    .clockSel = DL_I2C_CLOCK_BUSCLK,
-    .divideRatio = DL_I2C_CLOCK_DIVIDE_1,
-};
-
-SYSCONFIG_WEAK void SYSCFG_DL_HUIDU_init(void) {
-
-    DL_I2C_setClockConfig(HUIDU_INST,
-        (DL_I2C_ClockConfig *) &gHUIDUClockConfig);
-    DL_I2C_setAnalogGlitchFilterPulseWidth(HUIDU_INST,
-        DL_I2C_ANALOG_GLITCH_FILTER_WIDTH_50NS);
-    DL_I2C_enableAnalogGlitchFilter(HUIDU_INST);
-    DL_I2C_setDigitalGlitchFilterPulseWidth(HUIDU_INST,
-        DL_I2C_DIGITAL_GLITCH_FILTER_WIDTH_CLOCKS_1);
-
-    /* Configure Controller Mode */
-    DL_I2C_resetControllerTransfer(HUIDU_INST);
-    /* Set frequency to 100000 Hz*/
-    DL_I2C_setTimerPeriod(HUIDU_INST, 39);
-    DL_I2C_setControllerTXFIFOThreshold(HUIDU_INST, DL_I2C_TX_FIFO_LEVEL_BYTES_7);
-    DL_I2C_setControllerRXFIFOThreshold(HUIDU_INST, DL_I2C_RX_FIFO_LEVEL_BYTES_8);
-    DL_I2C_enableControllerClockStretching(HUIDU_INST);
-
-
-    /* Enable module */
-    DL_I2C_enableController(HUIDU_INST);
-
-
-}
 
 static const DL_UART_Main_ClockConfig gDEBUGClockConfig = {
     .clockSel    = DL_UART_MAIN_CLOCK_BUSCLK,

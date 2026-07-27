@@ -130,19 +130,31 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 
 
 
-/* Defines for HUIDU */
-#define HUIDU_INST                                                          I2C1
-#define HUIDU_INST_IRQHandler                                    I2C1_IRQHandler
-#define HUIDU_INST_INT_IRQN                                        I2C1_INT_IRQn
-#define HUIDU_BUS_SPEED_HZ                                                100000
-#define GPIO_HUIDU_SDA_PORT                                                GPIOB
-#define GPIO_HUIDU_SDA_PIN                                         DL_GPIO_PIN_3
-#define GPIO_HUIDU_IOMUX_SDA                                     (IOMUX_PINCM16)
-#define GPIO_HUIDU_IOMUX_SDA_FUNC                      IOMUX_PINCM16_PF_I2C1_SDA
-#define GPIO_HUIDU_SCL_PORT                                                GPIOB
-#define GPIO_HUIDU_SCL_PIN                                         DL_GPIO_PIN_2
-#define GPIO_HUIDU_IOMUX_SCL                                     (IOMUX_PINCM15)
-#define GPIO_HUIDU_IOMUX_SCL_FUNC                      IOMUX_PINCM15_PF_I2C1_SCL
+/* Defines for XUNJI */
+#define XUNJI_L1_PORT                                                       GPIOB
+#define XUNJI_L1_PIN                                                DL_GPIO_PIN_6
+#define XUNJI_L1_IOMUX                                             (IOMUX_PINCM23)
+#define XUNJI_L2_PORT                                                       GPIOB
+#define XUNJI_L2_PIN                                                DL_GPIO_PIN_7
+#define XUNJI_L2_IOMUX                                             (IOMUX_PINCM24)
+#define XUNJI_L3_PORT                                                       GPIOA
+#define XUNJI_L3_PIN                                               DL_GPIO_PIN_17
+#define XUNJI_L3_IOMUX                                             (IOMUX_PINCM39)
+#define XUNJI_L4_PORT                                                       GPIOA
+#define XUNJI_L4_PIN                                               DL_GPIO_PIN_18
+#define XUNJI_L4_IOMUX                                             (IOMUX_PINCM40)
+#define XUNJI_R1_PORT                                                       GPIOA
+#define XUNJI_R1_PIN                                               DL_GPIO_PIN_21
+#define XUNJI_R1_IOMUX                                             (IOMUX_PINCM43)
+#define XUNJI_R2_PORT                                                       GPIOA
+#define XUNJI_R2_PIN                                               DL_GPIO_PIN_22
+#define XUNJI_R2_IOMUX                                             (IOMUX_PINCM46)
+#define XUNJI_R3_PORT                                                       GPIOA
+#define XUNJI_R3_PIN                                               DL_GPIO_PIN_24
+#define XUNJI_R3_IOMUX                                             (IOMUX_PINCM50)
+#define XUNJI_R4_PORT                                                       GPIOA
+#define XUNJI_R4_PIN                                               DL_GPIO_PIN_25
+#define XUNJI_R4_IOMUX                                             (IOMUX_PINCM51)
 
 
 /* Defines for DEBUG */
@@ -194,21 +206,11 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for LED1: GPIOA.15 with pinCMx 37 on package pin 8 */
 #define LED_LED1_PIN                                            (DL_GPIO_PIN_15)
 #define LED_LED1_IOMUX                                           (IOMUX_PINCM37)
-/* Port definition for Pin Group KEY */
-#define KEY_PORT                                                         (GPIOB)
 
-/* Defines for KEY9: GPIOB.6 with pinCMx 23 on package pin 58 */
-// groups represented: ["DC_MOTOR","KEY"]
-// pins affected: ["AA","BA","KEY9","KEY10"]
+/* Interrupt defines for GPIOB (encoder inputs) */
 #define GPIO_MULTIPLE_GPIOB_INT_IRQN                            (GPIOB_INT_IRQn)
 #define GPIO_MULTIPLE_GPIOB_INT_IIDX            (DL_INTERRUPT_GROUP1_IIDX_GPIOB)
-#define KEY_KEY9_IIDX                                        (DL_GPIO_IIDX_DIO6)
-#define KEY_KEY9_PIN                                             (DL_GPIO_PIN_6)
-#define KEY_KEY9_IOMUX                                           (IOMUX_PINCM23)
-/* Defines for KEY10: GPIOB.7 with pinCMx 24 on package pin 59 */
-#define KEY_KEY10_IIDX                                       (DL_GPIO_IIDX_DIO7)
-#define KEY_KEY10_PIN                                            (DL_GPIO_PIN_7)
-#define KEY_KEY10_IOMUX                                          (IOMUX_PINCM24)
+
 /* Defines for AIN2: GPIOA.8 with pinCMx 19 on package pin 54 */
 #define DC_MOTOR_AIN2_PORT                                               (GPIOA)
 #define DC_MOTOR_AIN2_PIN                                        (DL_GPIO_PIN_8)
@@ -221,15 +223,15 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define DC_MOTOR_STBY_PORT                                               (GPIOB)
 #define DC_MOTOR_STBY_PIN                                       (DL_GPIO_PIN_24)
 #define DC_MOTOR_STBY_IOMUX                                      (IOMUX_PINCM52)
-/* Defines for AA: GPIOB.13 with pinCMx 30 on package pin 1 */
+/* Defines for AA: GPIOB.8 with pinCMx 25 on package pin 60 */
 #define DC_MOTOR_AA_PORT                                                 (GPIOB)
-#define DC_MOTOR_AA_IIDX                                    (DL_GPIO_IIDX_DIO13)
-#define DC_MOTOR_AA_PIN                                         (DL_GPIO_PIN_13)
-#define DC_MOTOR_AA_IOMUX                                        (IOMUX_PINCM30)
-/* Defines for AB: GPIOA.22 with pinCMx 47 on package pin 18 */
-#define DC_MOTOR_AB_PORT                                                 (GPIOA)
-#define DC_MOTOR_AB_PIN                                         (DL_GPIO_PIN_22)
-#define DC_MOTOR_AB_IOMUX                                        (IOMUX_PINCM47)
+#define DC_MOTOR_AA_IIDX                                     (DL_GPIO_IIDX_DIO8)
+#define DC_MOTOR_AA_PIN                                          (DL_GPIO_PIN_8)
+#define DC_MOTOR_AA_IOMUX                                        (IOMUX_PINCM25)
+/* Defines for AB: GPIOB.9 with pinCMx 26 on package pin 61 */
+#define DC_MOTOR_AB_PORT                                                 (GPIOB)
+#define DC_MOTOR_AB_PIN                                          (DL_GPIO_PIN_9)
+#define DC_MOTOR_AB_IOMUX                                        (IOMUX_PINCM26)
 /* Defines for BIN2: GPIOB.18 with pinCMx 44 on package pin 15 */
 #define DC_MOTOR_BIN2_PORT                                               (GPIOB)
 #define DC_MOTOR_BIN2_PIN                                       (DL_GPIO_PIN_18)
@@ -260,7 +262,6 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 void SYSCFG_DL_SERVO_init(void);
 void SYSCFG_DL_PWMAB_init(void);
 void SYSCFG_DL_MOTOR_PID_init(void);
-void SYSCFG_DL_HUIDU_init(void);
 void SYSCFG_DL_DEBUG_init(void);
 void SYSCFG_DL_xuanniu_init(void);
 void SYSCFG_DL_VREF_init(void);
