@@ -9,30 +9,19 @@
 #define MOTOR_PWM_MAX_DUTY  (4000)
 #define MOTOR_PWM_RAMP_STEP (200)
 
-/**
- * 把“数值越大、实际占空比越大”的逻辑 PWM 转换为 TIMG0 比较值。
- *
- * 当前 SysConfig 使用 EDGE_ALIGN_UP、初始输出低电平。TI 官方同类配置
- * 中比较值越小占空比越大，因此必须写入 period-duty，不能直接写 duty。
- */
-static uint32_t motor_duty_to_compare(int duty)
-{
-    return (uint32_t) (MOTOR_PWM_MAX_DUTY - duty);
-}
-
 void motor_init(uint8_t motor_id)
 {
     if(motor_id == 1 || motor_id == 3){
         DL_GPIO_setPins(DC_MOTOR_AIN1_PORT, DC_MOTOR_AIN1_PIN);
         DL_GPIO_setPins(DC_MOTOR_AIN2_PORT, DC_MOTOR_AIN2_PIN);
         DL_Timer_setCaptureCompareValue(
-            PWMAB_INST, MOTOR_PWM_MAX_DUTY, GPIO_PWMAB_C0_IDX);
+            PWMAB_INST, 0U, GPIO_PWMAB_C0_IDX);
     }
     if(motor_id == 2 || motor_id == 3){
         DL_GPIO_setPins(DC_MOTOR_BIN1_PORT, DC_MOTOR_BIN1_PIN);
         DL_GPIO_setPins(DC_MOTOR_BIN2_PORT, DC_MOTOR_BIN2_PIN);
         DL_Timer_setCaptureCompareValue(
-            PWMAB_INST, MOTOR_PWM_MAX_DUTY, GPIO_PWMAB_C1_IDX);
+            PWMAB_INST, 0U, GPIO_PWMAB_C1_IDX);
     }
     DL_Timer_startCounter(PWMAB_INST);
     DL_GPIO_setPins(DC_MOTOR_STBY_PORT, DC_MOTOR_STBY_PIN);
@@ -73,15 +62,14 @@ static int motor_ramp_duty(int current_duty, int requested_duty)
 void motor_set_duty(uint8_t motor_id, uint32_t duty)
 {
     int limited_duty = limit_duty((int) duty);
-    uint32_t compare_value = motor_duty_to_compare(limited_duty);
 
     if(motor_id == 1){
         DL_Timer_setCaptureCompareValue(
-            PWMAB_INST, compare_value, GPIO_PWMAB_C0_IDX);
+            PWMAB_INST, (uint32_t) limited_duty, GPIO_PWMAB_C0_IDX);
     }
     else if(motor_id == 2){
         DL_Timer_setCaptureCompareValue(
-            PWMAB_INST, compare_value, GPIO_PWMAB_C1_IDX);
+            PWMAB_INST, (uint32_t) limited_duty, GPIO_PWMAB_C1_IDX);
     }
 }
 
