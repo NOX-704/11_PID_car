@@ -46,7 +46,6 @@
 // 所有的GND都需要连接在一起
 
 #include "ti_msp_dl_config.h"
-#include "huidu.h"
 
 void motor_init(uint8_t motor_id);
 void motor_set_duty(uint8_t motor_id, uint32_t duty);

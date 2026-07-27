@@ -41,7 +41,6 @@
 int status = 0;
 extern float target_speed_1;
 extern float target_speed_2;
-extern uint8_t huidu_value[];
 
 int main(void)
 {

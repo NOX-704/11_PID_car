@@ -1,4 +1,5 @@
 #include "motor.h"
+#include "huidu.h"
 
 void motor_init(uint8_t motor_id)
 {
@@ -153,6 +154,5 @@ void MOTOR_PID_INST_IRQHandler()
         break;
     }
 }
-
 
 
