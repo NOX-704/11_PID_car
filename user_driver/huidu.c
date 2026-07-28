@@ -1,6 +1,7 @@
 #include "huidu.h"
 
 #include "motor.h"
+#include "MPU6050.h"
 #include "ti_msp_dl_config.h"
 
 /*
@@ -41,6 +42,7 @@ extern float target_speed_2;
 static float s_last_command_speed_1 = TRACK_STRAIGHT_SPEED;
 static float s_last_command_speed_2 = TRACK_STRAIGHT_SPEED;
 static uint8_t s_last_offset_level = 0U;
+static uint8_t s_turn_triggered = 0U;
 
 /**
  * 读取单路循迹 GPIO，并转换为与物理指示灯一致的逻辑值。
@@ -160,11 +162,31 @@ void adjust_motor(void)
     }
 
     /*
-     * 严重偏移后突然全亮通常表示车身已经越过黑带。此时保持上一档
-     * 转向，直到任意一路再次熄灭；其他全亮情况仍按居中直行处理。
+     * 任意一路不亮时说明循迹模块仍能感知黑带, 重置转弯触发标志。
+     */
+    if (unlit_count > 0U) {
+        s_turn_triggered = 0U;
+    }
+
+    /*
+     * 严重偏移后突然全亮通常表示车身已经越过黑带或黑带出现直角弯。
+     * 此时检查是否需要启动 MPU6050 角度控制完成 ±90° 转向：
+     *   - 上次差速命令中右轮更快 → 黑带偏左 → 需要左转 90°
+     *   - 上次差速命令中左轮更快 → 黑带偏右 → 需要右转 90°
+     * 触发后 MPU6050 接管速度控制, 直到角度收敛到目标后才交还。
      */
     if (unlit_count == 0U) {
         if (s_last_offset_level >= TRACK_LARGE_OFFSET_LEVEL) {
+            if ((s_turn_triggered == 0U) && (mpu6050_is_active() == 0U)) {
+                float delta;
+                if (s_last_command_speed_1 > s_last_command_speed_2) {
+                    delta = -90.0f;
+                } else {
+                    delta = 90.0f;
+                }
+                mpu6050_start_turn(delta);
+                s_turn_triggered = 1U;
+            }
             target_speed_1 = s_last_command_speed_1;
             target_speed_2 = s_last_command_speed_2;
         } else {

@@ -1,6 +1,6 @@
 # FIXED
 
-main.o: ../main.c \
+user_driver/MPU6050.o: ../user_driver/MPU6050.c ../user_driver/MPU6050.h \
  ti_msp_dl_config.h \
  D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/devices/msp/msp.h \
  D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/devices/DeviceFamily.h \
@@ -84,12 +84,8 @@ main.o: ../main.c \
  D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/dl_wwdt.h \
  D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/m0p/dl_interrupt.h \
  D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/m0p/dl_systick.h \
- C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/delay.h \
- C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/uart.h \
- C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/key.h \
- C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/motor.h \
- C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/huidu.h \
- C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/MPU6050.h
+ ../user_driver/motor.h
+../user_driver/MPU6050.h:
 ti_msp_dl_config.h:
 D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/devices/msp/msp.h:
 D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/devices/DeviceFamily.h:
@@ -173,9 +169,4 @@ D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/dl_vref.h:
 D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/dl_wwdt.h:
 D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/m0p/dl_interrupt.h:
 D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/m0p/dl_systick.h:
-C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/delay.h:
-C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/uart.h:
-C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/key.h:
-C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/motor.h:
-C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/huidu.h:
-C:/Users/80706/workspace_ccstheia/11_PID_car/user_driver/MPU6050.h:
+../user_driver/motor.h:

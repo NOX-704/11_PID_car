@@ -1,5 +1,6 @@
 #include "motor.h"
 #include "huidu.h"
+#include "MPU6050.h"
 
 /*
  * 电机 PWM 周期为 4000，控制中断周期为 10 ms。
@@ -177,7 +178,14 @@ void MOTOR_PID_INST_IRQHandler()
     switch (DL_Timer_getPendingInterrupt(MOTOR_PID_INST))
     {
     case DL_TIMER_IIDX_LOAD:
-        adjust_motor();
+        mpu6050_update_yaw();
+
+        if (mpu6050_is_active()) {
+            mpu6050_angle_control();
+        } else {
+            adjust_motor();
+        }
+
         calculate_speed(1);
         DC_MOTOR_PID(1);
         calculate_speed(2);

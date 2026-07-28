@@ -37,6 +37,7 @@
 #include "key.h"
 #include "motor.h"
 #include "huidu.h"
+#include "MPU6050.h"
 
 int status = 0;
 extern float target_speed_1;
@@ -54,6 +55,7 @@ int main(void)
     DL_Timer_setCaptureCompareValue(SERVO_INST, 50, GPIO_SERVO_C1_IDX);
     target_speed_1 = 0;
     target_speed_2 = 0;
+    mpu6050_init();
     motor_init(3);
     
     char huidu_buf[16];

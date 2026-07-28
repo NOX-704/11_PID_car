@@ -6,6 +6,7 @@ SHELL = cmd.exe
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
+../user_driver/MPU6050.c \
 ../user_driver/delay.c \
 ../user_driver/huidu.c \
 ../user_driver/key.c \
@@ -13,6 +14,7 @@ C_SRCS += \
 ../user_driver/uart.c 
 
 C_DEPS += \
+./user_driver/MPU6050.d \
 ./user_driver/delay.d \
 ./user_driver/huidu.d \
 ./user_driver/key.d \
@@ -20,6 +22,7 @@ C_DEPS += \
 ./user_driver/uart.d 
 
 OBJS += \
+./user_driver/MPU6050.o \
 ./user_driver/delay.o \
 ./user_driver/huidu.o \
 ./user_driver/key.o \
@@ -27,6 +30,7 @@ OBJS += \
 ./user_driver/uart.o 
 
 OBJS__QUOTED += \
+"user_driver\MPU6050.o" \
 "user_driver\delay.o" \
 "user_driver\huidu.o" \
 "user_driver\key.o" \
@@ -34,6 +38,7 @@ OBJS__QUOTED += \
 "user_driver\uart.o" 
 
 C_DEPS__QUOTED += \
+"user_driver\MPU6050.d" \
 "user_driver\delay.d" \
 "user_driver\huidu.d" \
 "user_driver\key.d" \
@@ -41,6 +46,7 @@ C_DEPS__QUOTED += \
 "user_driver\uart.d" 
 
 C_SRCS__QUOTED += \
+"../user_driver/MPU6050.c" \
 "../user_driver/delay.c" \
 "../user_driver/huidu.c" \
 "../user_driver/key.c" \

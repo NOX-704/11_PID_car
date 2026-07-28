@@ -84,7 +84,7 @@ user_driver/motor.o: ../user_driver/motor.c ../user_driver/motor.h \
  D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/dl_wwdt.h \
  D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/m0p/dl_interrupt.h \
  D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/m0p/dl_systick.h \
- ../user_driver/huidu.h
+ ../user_driver/huidu.h ../user_driver/MPU6050.h
 ../user_driver/motor.h:
 ti_msp_dl_config.h:
 D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/devices/msp/msp.h:
@@ -170,3 +170,4 @@ D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/dl_wwdt.h:
 D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/m0p/dl_interrupt.h:
 D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/driverlib/m0p/dl_systick.h:
 ../user_driver/huidu.h:
+../user_driver/MPU6050.h:
