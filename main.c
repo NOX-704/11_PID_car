@@ -50,7 +50,6 @@ int main(void)
     // NVIC_EnableIRQ(KEY_INT_IRQN);
     /* 启用 DC_MOTOR GPIOB 中断，用于统计两路编码器 A 相上升沿。 */
     NVIC_EnableIRQ(DC_MOTOR_INT_IRQN);
-    DL_ADC12_enableConversions(xuanniu_INST);
     DL_Timer_startCounter(SERVO_INST);
     DL_Timer_setCaptureCompareValue(SERVO_INST, 50, GPIO_SERVO_C1_IDX);
     target_speed_1 = 0;
@@ -66,22 +65,6 @@ int main(void)
         delay_ms(500);
         // delay_ms(1000);
         // motor_set_direction(1, 1);
-        
-        // // 通知ADC开始采样
-        // DL_ADC12_startConversion(xuanniu_INST);
-
-        // //等Adc采样完
-        // delay_ms(10);
-
-        // // 获取ADC采样结果
-        // uint16_t adc_result = DL_ADC12_getMemResult(xuanniu_INST, xuanniu_ADCMEM_0);
-        // float_t adc_value = adc_result * xuanniu_ADCMEM_0_REF_VOLTAGE_V / 4096.0; // Assuming 12-bit ADC resolution
-        
-        // char oled_str[50];
-        // sprintf(oled_str, "ADC: %.2f V", adc_value);
-        // OLED_ShowString(0, 32, (u8 *)oled_str, 16);
-        // OLED_Refresh();
-        
 
         // if(status == 0){
         //     OLED_Clear();

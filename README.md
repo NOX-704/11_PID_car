@@ -4,17 +4,20 @@
 
 > 当前循迹方向由黑带重心和四档差速决定，不是横向误差 PID；PID 只负责两个电机通道的速度闭环。
 
-## GPIO 迁移确认
+## PCB V1.0 基准
 
-队友已经完成了从 I2C 循迹模块到普通 GPIO 循迹模块的代码迁移。Git 提交 `86135d4` 中可以看到：
+本工程以 2026-07-28 更新的“电赛小车底板 V1.0”原理图为唯一板级引脚基准。关键接口如下：
 
-- `empty.syscfg` 删除了名为 `HUIDU` 的 I2C1 实例及 PB2/PB3 的 SCL/SDA 配置。
-- `empty.syscfg` 新增了名为 `XUNJI` 的 8 路 GPIO 输入组。
-- `huidu_get_value()` 已不再发送 I2C 地址 `0x12` 和命令 `0x30`，而是直接读取 `L1~L4`、`R1~R4`。
-- 原来的 PB6/PB7 按键被删除，这两个引脚现在用于 `XUNJI_L1/L2`。
-- 电机 A 编码器从 PB13/PA22 改到了 PB8/PB9。
+| PCB 接口 | 用途 | MSPM0G3507 引脚 |
+|---|---|---|
+| H1/H6/H7 | OLED、MPU6050 等共享 I²C1 | PB2=SCL，PB3=SDA |
+| H2-3～H2-10 | 八路数字循迹 L1、L2、L3、L4、R1、R2、R3、R4 | PA18、PA16、PB7、PA17、PA21、PA22、PA24、PA2 |
+| H3 | 舵机 PWM / 5V / GND | PA27 |
+| H4 | 调试串口 TX / RX / GND | PA28、PA31 |
+| H5 | K230 串口 TX / RX / GND | PA26、PA25 |
+| SW1 | 启动按键，高电平按下 | PB6 |
 
-因此，本工程当前不是 I2C 循迹版本。商品型号未在仓库中注明，README 只按源码确认它是八路独立数字输出模块。
+原理图的 TB6612FNG `AIN1`、`AIN2` 网络旁都标成了 `PA8`，同一 GPIO 无法控制两路方向信号。结合已经按该底板验证过的 `k230control` 工程，本工程固定使用 `AIN1=PA9、AIN2=PA8`；若后续 PCB 网表与此不一致，必须先改硬件，不能把两个方向输入同时配置为 PA8。
 
 ## 当前工程状态
 
@@ -25,13 +28,14 @@
 | 双路电机 PWM | 启用 | TIMG0 双通道，约 10 kHz，比较值范围 `0~4000` |
 | 双编码器测速 | 启用 | 每个编码器只统计 A 相上升沿，10 ms 计算一次速度 |
 | 双路增量式 PID | 启用 | 默认 `Kp=0.5`、`Ki=0.4`、`Kd=0.1` |
-| UART 调试输出 | TX 启用 | PA10，115200 8N1，每 500 ms 输出一次八路逻辑值 |
+| UART 调试输出 | TX 启用 | H4 / PA28，115200 8N1，每 500 ms 输出一次八路逻辑值 |
 | UART 接收 | 仅配置 | SysConfig 配置了 RX 中断，但 NVIC 和处理代码未启用 |
-| ADC1 通道 1 | 仅初始化 | PA16、内部 2.5 V VREF，主循环没有读取结果 |
+| K230 UART3 | 引脚已配置 | H5：PA25=RX、PA26=TX，9600 8N1；当前工程尚未解析视觉协议 |
+| MPU6050 / 扩展 I²C1 | 启用 | PB2=SCL、PB3=SDA，400 kHz；与三个 4Pin I²C 接口共用 |
 | 舵机 PWM | 仅初始化 | PA27、50 Hz，启动时比较值为 `50`，没有动态控制 |
 | LED0/LED1 | 仅配置 | PA14/PA15，当前没有运行时控制 |
-| 按键 | 已移除 | PB6/PB7 已让给循迹输入，当前没有开始/停止按键 |
-| 干净重生成、编译与链接 | 已通过 | 2026-07-27 使用 `make check` 和 CCS Debug 构建验证通过 |
+| 启动按键 | 引脚已配置 | SW1 / PB6，内部下拉、高电平按下；当前尚未接入开始/停止状态机 |
+| 干净重生成与对象编译 | 已通过 | 2026-07-29 使用 `make check` 验证通过 |
 
 程序初始化后会立即启动 10 ms 电机控制定时器，没有独立的开始/停止状态机。首次上电调试必须架空车轮。
 
@@ -39,16 +43,18 @@
 
 初始化阶段：
 
-1. `SYSCFG_DL_init()` 初始化 80 MHz 时钟、GPIO、PWM、定时器、UART、ADC 和 VREF。
+1. `SYSCFG_DL_init()` 初始化 80 MHz 时钟、GPIO、PWM、定时器、UART3、UART0 和 I²C1。
 2. 启用 GPIOB 中断，计划用于两个编码器 A 相计数。
-3. 启用 ADC 转换，启动 TIMG7 舵机 PWM，并把比较值设为 `50`。
+3. 启动 TIMG7 舵机 PWM，并把比较值设为 `50`。
 4. 把两路目标速度清零。
-5. `motor_init(3)` 初始化 TB6612FNG A/B 通道，启动 TIMG0 电机 PWM 和 TIMA0 10 ms 控制定时器。
+5. 在 PB2/PB3 的 I²C1 总线上初始化 MPU6050。
+6. `motor_init(3)` 初始化 TB6612FNG A/B 通道，启动 TIMG0 电机 PWM 和 TIMA0 10 ms 控制定时器。
 
 运行阶段包含两条并行路径：
 
 - 主循环：读取八路 GPIO，拼成 `11111111` 形式的亮灭状态字符串，通过 UART0 每 500 ms 发送一次。
 - TIMA0 中断：读取八路 GPIO → 更新两路目标速度 → 计算编码器速度 → 执行双路增量式 PID → 更新 PWM。
+- K230 UART3 由 SysConfig 完成引脚和波特率初始化，但本工程暂未启用接收中断或协议解析。
 
 `delay_ms(500)` 只阻塞主循环；中断中的循迹、测速和 PID 仍按 10 ms 周期运行。
 
@@ -77,16 +83,16 @@ v[0]    v[1]    v[2]    v[3]    v[4]    v[5]    v[6]    v[7]
 
 | 外设功能 | 芯片/模块型号 | 地猛星引脚 | IOMUX 索引 | 片上复用功能 | 备注 |
 |---|---|---|---|---|---|
-| 循迹 L1 / 最左 | 八路数字循迹模块，具体型号未注明 | PB6 | PINCM23 | GPIO 输入 | 内部下拉；亮/白=`1`，灭/黑=`0` |
-| 循迹 L2 | 同上 | PB7 | PINCM24 | GPIO 输入 | 内部下拉；亮/白=`1`，灭/黑=`0` |
-| 循迹 L3 | 同上 | PA17 | PINCM39 | GPIO 输入 | 内部下拉；亮/白=`1`，灭/黑=`0` |
-| 循迹 L4 / 左中 | 同上 | PA18 | PINCM40 | GPIO 输入 | 亮/白=`1`，灭/黑=`0`；PA18 兼有 BSL 相关功能 |
+| 循迹 L1 / 最左 / H2-3 | 八路数字循迹模块，具体型号未注明 | PA18 | PINCM40 | GPIO 输入 | 内部下拉；亮/白=`1`，灭/黑=`0` |
+| 循迹 L2 / H2-4 | 同上 | PA16 | PINCM38 | GPIO 输入 | 内部下拉；亮/白=`1`，灭/黑=`0` |
+| 循迹 L3 / H2-5 | 同上 | PB7 | PINCM24 | GPIO 输入 | 内部下拉；亮/白=`1`，灭/黑=`0` |
+| 循迹 L4 / 左中 / H2-6 | 同上 | PA17 | PINCM39 | GPIO 输入 | 内部下拉；亮/白=`1`，灭/黑=`0` |
 | 循迹 R1 / 右中 | 同上 | PA21 | PINCM46 | GPIO 输入 | 亮/白=`1`，灭/黑=`0`；PA21 兼有 VREF- 相关功能 |
 | 循迹 R2 | 同上 | PA22 | PINCM47 | GPIO 输入 | 内部下拉；亮/白=`1`，灭/黑=`0` |
 | 循迹 R3 | 同上 | PA24 | PINCM54 | GPIO 输入 | 内部下拉；亮/白=`1`，灭/黑=`0` |
-| 循迹 R4 / 最右 | 同上 | PA25 | PINCM55 | GPIO 输入 | 内部下拉；亮/白=`1`，灭/黑=`0` |
+| 循迹 R4 / 最右 / H2-10 | 同上 | PA2 | PINCM7 | GPIO 输入 | 内部下拉；按 PCB 配置，须确认核心板确实引出 PA2 |
 
-IOMUX 索引来自使用 SysConfig 1.26.2 根据当前 `empty.syscfg` 重新生成的配置，不应以仓库中历史 `Debug/ti_msp_dl_config.h` 的旧索引为准。
+H2-7、H2-8、H2-9 依次对应 R1、R2、R3。IOMUX 索引来自使用 SysConfig 1.26.2 根据当前 `empty.syscfg` 重新生成的配置，不应以仓库中历史 `Debug/ti_msp_dl_config.h` 的旧索引为准。
 
 ### 黑带重心与差速
 
@@ -175,10 +181,14 @@ PWM(k) = move_toward(PWM(k-1), PWM_request(k), 200)
 | 右轮电机 A 编码器 B 相 | 同上 | PB9 | PINCM26 | GPIO 输入 | 当前未参与方向判断 |
 | 左轮电机 B 编码器 A 相 | 同上 | PB19 | PINCM45 | GPIO 输入/上升沿中断 | 参与计数 |
 | 左轮电机 B 编码器 B 相 | 同上 | PB20 | PINCM48 | GPIO 输入 | 无内部上下拉，当前不参与方向判断 |
-| 调试串口 TX | 外接 3.3 V USB-UART | PA10 | PINCM21 | UART0_TX | 115200 8N1 |
-| 调试串口 RX | 外接 3.3 V USB-UART | PA11 | PINCM22 | UART0_RX | 当前接收处理未启用 |
-| 舵机 PWM | 具体型号未注明 | PA27 | PINCM60 | TIMG7_CCP1 | 50 Hz，当前无动态控制 |
-| ADC 输入 | 外部模拟信号，具体模块未注明 | PA16 | PINCM38 | ADC1 通道 1 | 12 bit，内部 2.5 V 参考 |
+| 调试串口 TX / H4-1 | 外接 3.3 V USB-UART | PA28 | PINCM3 | UART0_TX | 115200 8N1 |
+| 调试串口 RX / H4-2 | 外接 3.3 V USB-UART | PA31 | PINCM6 | UART0_RX | 当前接收处理未启用 |
+| K230 UART RX / H5-2 | 亚博 K230 通信座 TXD / IO9 | PA25 | PINCM55 | UART3_RX | K230 → 小车，9600 8N1 |
+| K230 UART TX / H5-1 | 亚博 K230 通信座 RXD / IO10 | PA26 | PINCM59 | UART3_TX | 小车 → K230，当前仅预留 |
+| I²C1 SCL / H1、H6、H7 | MPU6050、OLED 等 | PB2 | PINCM15 | I2C1_SCL | 400 kHz，模块侧需有 3.3 V 上拉 |
+| I²C1 SDA / H1、H6、H7 | 同上 | PB3 | PINCM16 | I2C1_SDA | 400 kHz，模块侧需有 3.3 V 上拉 |
+| 启动按键 / SW1 | 板载按键 | PB6 | PINCM23 | GPIO 输入 | 内部下拉，按下接 3.3 V |
+| 舵机 PWM / H3-1 | 具体型号未注明 | PA27 | PINCM60 | TIMG7_CCP1 | 50 Hz，当前无动态控制 |
 | LED0 | 外接 LED，具体型号未注明 | PA14 | PINCM36 | GPIO 输出 | 当前未驱动 |
 | LED1 | 外接 LED，具体型号未注明 | PA15 | PINCM37 | GPIO 输出 | 当前未驱动 |
 | SWDIO | SEGGER J-Link | PA19 | 专用调试引脚 | SWDIO | 不得复用 |
@@ -186,16 +196,18 @@ PWM(k) = move_toward(PWM(k-1), PWM_request(k), 200)
 | HFXIN | 40 MHz HFXT 时钟节点 | PA5 | PINCM10 | HFXIN | 时钟专用，不得改作普通 GPIO |
 | HFXOUT | 40 MHz HFXT 时钟节点 | PA6 | PINCM11 | HFXOUT | 时钟专用，不得改作普通 GPIO |
 
-八路循迹引脚见上一节的独立接线表。
+八路循迹引脚见上一节的 H2 独立接线表。PA16 已由原 ADC 输入改为循迹 L2，ADC/VREF 实例已从 SysConfig 删除。
 
 ## 电源与电平
 
 - MSPM0G3507 GPIO 为 3.3 V 电平，任何传感器输出都不能直接向 MCU 输入 5 V。
 - 循迹模块型号和供电范围未在仓库中注明。若模块使用 5 V 供电，必须确认 8 路数字输出的高电平不超过 3.3 V，必要时使用电平转换。
 - TB6612FNG 逻辑电源按源码注释使用 3.3 V，电机电源 VM 为 7.4 V。
-- MCU、循迹模块、TB6612FNG、编码器和外接 USB-UART 必须共地。
-- 当前调试 UART 使用 PA10/PA11，需要外接 3.3 V USB-UART，不是地猛星板载 CH340 默认使用的 PA0/PA1。
-- 当前 XUNJI_L4 使用 PA18。PA18 与 BSL/按键资源有关，使用 J-Link 调试时仍应确认地猛星实板没有外部电路干扰该输入。
+- MCU、K230、循迹模块、TB6612FNG、编码器和外接 USB-UART 必须共地。
+- K230 与小车各自供电时，H5 只接 TX、RX、GND，不连接 K230 通信座的 5V，避免两路电源回灌。
+- H4 调试 UART 使用 PA28/PA31；PA0/PA1 不再被本工程的 UART 或 I²C 占用。
+- PB2/PB3 是开漏 I²C，总线必须有到 3.3 V 的上拉；底板原理图未画出上拉时，应由所接模块提供。
+- 循迹 R4 按 PCB 使用 PA2。PA2 兼有 ROSC 功能，烧录前必须确认所用地猛星核心板版本已把该脚实际引到母座，且没有时钟器件占用。
 
 ## 工程结构
 
@@ -207,6 +219,7 @@ PWM(k) = move_toward(PWM(k-1), PWM_request(k), 200)
 │   ├── delay.c/.h                 # 阻塞毫秒延时
 │   ├── huidu.c/.h                 # 八路 GPIO 读取和循迹规则
 │   ├── key.c/.h                   # 当前只保留编码器 GPIOB 中断计数
+│   ├── MPU6050.c/.h               # PB2/PB3 I²C1 陀螺仪与转角控制
 │   ├── motor.c/.h                 # TB6612FNG、测速和双路增量式 PID
 │   └── uart.c/.h                  # 阻塞式 UART 发送
 ├── .vscode/c_cpp_properties.json  # Mac/Windows 共享 IntelliSense 配置
@@ -298,15 +311,14 @@ macOS 系统自带的 GNU Make 3.81 不支持 CCS 生成文件使用的 `-Onone`
 
 ### 当前验证结果
 
-2026-07-27 在 macOS 上使用 MSPM0 SDK 2.10.00.04、SysConfig 1.26.2 和 TI ArmClang 5.1.1.LTS 检查：
+2026-07-29 在 macOS 上使用 MSPM0 SDK 2.10.00.04、SysConfig 1.26.2 和 TI ArmClang 5.1.1.LTS 检查：
 
-- 当前 `empty.syscfg` 的 SysConfig 生成成功，确认 I2C1 已删除，8 路 `XUNJI` GPIO 可以生成。
-- `main.c` 使用当前生成的 `DC_MOTOR_INT_IRQN` 启用编码器 GPIOB 中断。
-- `Makefile` 已检查 `DC_MOTOR_INT_IRQN` 和全部 `XUNJI_L1~R4` 端口/引脚宏，不再依赖旧 I2C 宏 `HUIDU_INST`。
-- `main.c`、全部 `user_driver/*.c` 和生成的 `ti_msp_dl_config.c` 对象编译均为 0 报错。
-- 使用 CCS 自带 GNU Make 和本机解析到的 TI ArmClang 4.0.2.LTS 完成 Debug 链接，成功生成 `Debug/11_PID_car.out`。
+- `empty.syscfg` 干净生成成功，UART0、UART3、I²C1、8 路 `XUNJI`、SW1、电机、编码器和舵机之间没有引脚冲突。
+- 生成结果确认 K230 为 PA25/PA26 UART3 9600、调试口为 PA28/PA31 UART0 115200、共享 I²C1 为 PB2/PB3 400 kHz。
+- `Makefile` 会逐项核对 PCB 关键端口、引脚、外设实例和波特率，任何后续误改都会让 `make check` 失败。
+- `main.c`、全部 `user_driver/*.c`（包括 MPU6050）和生成的 `ti_msp_dl_config.c` 对象编译均为 0 报错。
 
-以上结果证明当前工程能够干净生成 SysConfig、通过对象编译并完成 Debug 链接，但不等同于烧录或实车功能验证。烧录前仍应在当前电脑上重新执行一次检查。
+以上结果证明当前工程能够干净生成 SysConfig 并通过对象编译，但不等同于烧录或实车功能验证。本次检查未覆盖完整链接，烧录前仍应在当前电脑上重新执行一次检查和 CCS Clean/Rebuild。
 
 ## 串口调试输出
 
@@ -314,8 +326,8 @@ macOS 系统自带的 GNU Make 3.81 不支持 CCS 生成文件使用的 `-Onone`
 
 | 外设功能 | 芯片/模块型号 | 地猛星引脚 | IOMUX 索引 | 片上复用功能 | 备注 |
 |---|---|---|---|---|---|
-| USB-UART RX ← MCU TX | 3.3 V USB-UART，具体型号未注明 | PA10 | PINCM21 | UART0_TX | 115200 8N1 |
-| USB-UART TX → MCU RX | 同上 | PA11 | PINCM22 | UART0_RX | 当前程序不处理接收 |
+| USB-UART RX ← MCU TX | 3.3 V USB-UART，具体型号未注明 | H4-1 / PA28 | PINCM3 | UART0_TX | 115200 8N1 |
+| USB-UART TX → MCU RX | 同上 | H4-2 / PA31 | PINCM6 | UART0_RX | 当前程序不处理接收 |
 | 公共地 | 同上 | GND | 不适用 | GND | 必须共地 |
 
 主循环每 500 ms 输出一行 8 个数字。直行时的典型输出为：
@@ -326,18 +338,31 @@ macOS 系统自带的 GNU Make 3.81 不支持 CCS 生成文件使用的 `-Onone`
 
 数字顺序是 `L1 L2 L3 L4 R1 R2 R3 R4`；其中 `1` 表示探头亮灯、看到白色，`0` 表示不亮、压到黑色胶带。例如 `11101111` 表示 L4 不亮，控制器会轻微向左修正。
 
+## K230 串口接线
+
+亚博 K230 仍使用板载四针通信座和 `YbUart(baudrate=9600)`，只需要在小车端改接到底板 H5：
+
+```text
+K230 TXD / IO9   → H5-2 / PA25 / UART3_RX
+K230 RXD / IO10  ← H5-1 / PA26 / UART3_TX
+K230 GND         ↔ H5-3 / GND
+```
+
+TX 与 RX 必须交叉，且两板必须共地。`empty.syscfg` 已初始化 `K230_LINK` 为 9600 8N1，但 `11_PID_car` 目前只完成硬件接口迁移，尚未实现视觉帧解析；需要视觉闭环时可复用同工作区 `k230control` 的 CRC-8/ATM 行协议与接收状态机。
+
 ## 上板前检查
 
-1. 逐路确认 L1~L4、R1~R4 的物理顺序与 GPIO 接线一致。
+1. 确认 H2-3～H2-10 依次是 L1、L2、L3、L4、R1、R2、R3、R4。
 2. 把各探头分别放在白底和黑带上，确认串口对应输出为 `1` 和 `0`。
 3. 确认循迹模块输出电平不超过 3.3 V，并让所有模块共地。
-4. 核对 TB6612FNG 的 PWMA/PWMB、AIN1/AIN2、BIN1/BIN2 以及 A/B 通道对应的左右车轮。
+4. 核对 TB6612FNG 的 `AIN1=PA9、AIN2=PA8`，不要按原理图重复的 `PA8` 标注接成同一信号。
 5. 核对编码器 A/B 相；当前 A 通道已经改为 PB8/PB9，不再是 PB13/PA22。
-6. 确认 PA18 没有被实板 BSL/按键电路占用或拉偏。
-7. 确认 PA10/PA11 使用外接 3.3 V USB-UART。
-8. 确认 PA19/PA20 只用于 J-Link SWD。
-9. 通过“SysConfig 生成 → 宏检查 → 对象编译”后再烧录。
-10. 第一次运行时架空车轮，因为电机控制定时器会在初始化后立即启动。
+6. 确认核心板已实际引出 PA2，且 R4 在白底/黑带上都能可靠翻转。
+7. 确认 H4 的 PA28/PA31 接 3.3 V USB-UART，H5 的 PA25/PA26 与 K230 TX/RX 交叉。
+8. 确认 PB2/PB3 I²C 总线存在到 3.3 V 的上拉，并让 OLED、MPU6050 等设备地址互不冲突。
+9. 确认 PA19/PA20 只用于 J-Link SWD。
+10. 通过“SysConfig 生成 → PCB 宏检查 → 对象编译”后再烧录。
+11. 第一次运行时架空车轮，因为电机控制定时器会在初始化后立即启动。
 
 ## 已知限制
 
@@ -346,9 +371,9 @@ macOS 系统自带的 GNU Make 3.81 不支持 CCS 生成文件使用的 `-Onone`
 - `11111111` 既可能表示黑带正确位于 L4/R1 间隙，也可能表示车辆完全离开黑带进入纯白区域；只有上一状态为第 3/4 档严重偏移时才保持原转向，否则仍会直行。
 - 循迹使用黑带加权重心和四档差速，不是连续横向 PID；`150/200/220/260/320/420` 为当前实车参数，仍可能需要继续整定。
 - 八路全灭时无法判断胶带中心，代码会把两路目标速度设为 `0`。
-- 没有开始/停止按键，上电后控制定时器立即运行。
+- SW1 / PB6 已配置为启动按键输入，但开始/停止状态机尚未实现，上电后控制定时器仍会立即运行。
 - 编码器只统计 A 相上升沿，无法判断方向，也没有利用 B 相提高分辨率。
 - PID 参数、轮径、编码器计数常量和目标速度均写死在源码中，没有在线调参或掉电保存。
-- UART RX、LED、ADC 结果和舵机动态控制尚未接入主运行流程。
-- `motor.h` 的部分方向引脚注释可能与 SysConfig 命名顺序不同，维护时应以 `empty.syscfg` 生成宏为准。
+- K230 UART3 只完成引脚和波特率初始化，视觉协议解析尚未接入主运行流程。
+- UART0 RX、LED 和舵机动态控制尚未接入主运行流程；原 PA16 ADC/VREF 已删除。
 - SysConfig 同时配置了 PA5/PA6 的 40 MHz HFXT 和 80 MHz CPU 时钟，修改时钟树前必须重新验证生成结果。

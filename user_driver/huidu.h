@@ -5,8 +5,8 @@
 
 /*
  * 八路循迹探头从车体左到右排列：
- * L1=PB6, L2=PB7, L3=PA17, L4=PA18,
- * R1=PA21, R2=PA22, R3=PA24, R4=PA25。
+ * L1=PA18, L2=PA16, L3=PB7, L4=PA17,
+ * R1=PA21, R2=PA22, R3=PA24, R4=PA2。
  */
 #define HUIDU_SENSOR_COUNT (8U)
 

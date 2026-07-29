@@ -10,8 +10,8 @@
 
 // G3507      TB6612
 // PB24 <--> STBY
-// PA8 <--> AIN1
-// PA9 <--> AIN2
+// PA9 <--> AIN1
+// PA8 <--> AIN2
 // PA12 <--> PWMA
 // GND <--> GND
 // 3V3 <--> VCC
