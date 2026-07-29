@@ -33,7 +33,7 @@
 #define TRACK_CORRECTION_STEP       (8.0f)
 
 /*
- * 中心黑线位于 L4/R1 间隙时可能出现八路全亮。若全亮前黑线已经明显
+ * 中心黑线位于 L4/R1 间隙时可能出现八路全白。若全白前黑线已经明显
  * 偏到一侧，先保持 150 ms 原方向寻找黑线，随后逐步衰减回直行，
  * 防止丢线后永久保持大差速。
  */
@@ -50,8 +50,8 @@ static const int8_t s_black_position_weight[HUIDU_SENSOR_COUNT] = {
 };
 
 /*
- * huidu_value[] 保存的是“灯是否亮”，不是“是否压到黑带”。
- * 当前模块为低电平有效：白色物体使指示灯点亮，同时 GPIO 输出低电平。
+ * 亚博智能八路循迹模块使用高电平表示检测到黑线：
+ * huidu_value[]=1 表示黑线，0 表示白色背景。
  */
 volatile uint8_t huidu_value[HUIDU_SENSOR_COUNT] = {0U};
 
@@ -131,14 +131,14 @@ static void huidu_reset_steering_pid(void)
 }
 
 /**
- * 读取单路循迹 GPIO，并转换为与物理指示灯一致的逻辑值。
+ * 读取亚博智能八路循迹模块的单路数字输出。
  *
- * @return 1 表示亮灯/白色，0 表示不亮/黑色胶带。
+ * @return 1 表示检测到黑色胶带，0 表示白色背景。
  */
-static uint8_t huidu_read_lit_state(GPIO_Regs *port, uint32_t pin)
+static uint8_t huidu_read_black_state(GPIO_Regs *port, uint32_t pin)
 {
     uint32_t raw_level = DL_GPIO_readPins(port, pin) & pin;
-    return (raw_level == 0U) ? 1U : 0U;
+    return (raw_level != 0U) ? 1U : 0U;
 }
 
 /**
@@ -199,14 +199,14 @@ static float huidu_steering_pid_update(float raw_error)
  */
 void huidu_get_value(void)
 {
-    huidu_value[0] = huidu_read_lit_state(XUNJI_L1_PORT, XUNJI_L1_PIN);
-    huidu_value[1] = huidu_read_lit_state(XUNJI_L2_PORT, XUNJI_L2_PIN);
-    huidu_value[2] = huidu_read_lit_state(XUNJI_L3_PORT, XUNJI_L3_PIN);
-    huidu_value[3] = huidu_read_lit_state(XUNJI_L4_PORT, XUNJI_L4_PIN);
-    huidu_value[4] = huidu_read_lit_state(XUNJI_R1_PORT, XUNJI_R1_PIN);
-    huidu_value[5] = huidu_read_lit_state(XUNJI_R2_PORT, XUNJI_R2_PIN);
-    huidu_value[6] = huidu_read_lit_state(XUNJI_R3_PORT, XUNJI_R3_PIN);
-    huidu_value[7] = huidu_read_lit_state(XUNJI_R4_PORT, XUNJI_R4_PIN);
+    huidu_value[0] = huidu_read_black_state(XUNJI_L1_PORT, XUNJI_L1_PIN);
+    huidu_value[1] = huidu_read_black_state(XUNJI_L2_PORT, XUNJI_L2_PIN);
+    huidu_value[2] = huidu_read_black_state(XUNJI_L3_PORT, XUNJI_L3_PIN);
+    huidu_value[3] = huidu_read_black_state(XUNJI_L4_PORT, XUNJI_L4_PIN);
+    huidu_value[4] = huidu_read_black_state(XUNJI_R1_PORT, XUNJI_R1_PIN);
+    huidu_value[5] = huidu_read_black_state(XUNJI_R2_PORT, XUNJI_R2_PIN);
+    huidu_value[6] = huidu_read_black_state(XUNJI_R3_PORT, XUNJI_R3_PIN);
+    huidu_value[7] = huidu_read_black_state(XUNJI_R4_PORT, XUNJI_R4_PIN);
 }
 
 /**
@@ -233,7 +233,7 @@ void adjust_motor(void)
     for (sensor_index = 0U;
          sensor_index < HUIDU_SENSOR_COUNT;
          sensor_index++) {
-        if (huidu_value[sensor_index] == 0U) {
+        if (huidu_value[sensor_index] != 0U) {
             weighted_error += s_black_position_weight[sensor_index];
             black_count++;
         }
@@ -260,7 +260,7 @@ void adjust_motor(void)
                (huidu_absf(s_last_visible_error) >=
                 TRACK_LOST_TRIGGER_ERROR)) {
         /*
-         * 严重偏移后全亮可能是刚刚越过黑线。短时间保持原方向寻找，
+         * 严重偏移后全白可能是刚刚越过黑线。短时间保持原方向寻找，
          * 超过 150 ms 后逐步衰减，避免旧差速无限锁住。
          */
         raw_error = s_last_visible_error;
@@ -271,7 +271,7 @@ void adjust_motor(void)
             raw_error = s_last_visible_error;
         }
     } else {
-        /* 中心黑线位于 L4/R1 间隙时八路全亮，目标误差为零。 */
+        /* 中心黑线位于 L4/R1 间隙时八路全白，目标误差为零。 */
         raw_error = 0.0f;
         s_lost_line_ticks = 0U;
     }

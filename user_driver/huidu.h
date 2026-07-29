@@ -11,8 +11,8 @@
 #define HUIDU_SENSOR_COUNT (8U)
 
 /*
- * 传感器逻辑值与板载指示灯保持一致：
- * 1 表示探头亮灯、检测到白色；0 表示不亮、检测到黑色胶带。
+ * 传感器逻辑采用亚博智能八路循迹模块的数字输出语义：
+ * 1 表示检测到黑色胶带，0 表示白色背景。
  * 该数组会同时在 TIMA0 控制中断和主循环串口输出中访问，因此使用 volatile。
  */
 extern volatile uint8_t huidu_value[HUIDU_SENSOR_COUNT];
@@ -21,7 +21,7 @@ extern volatile uint8_t huidu_value[HUIDU_SENSOR_COUNT];
 extern volatile float huidu_line_error;
 extern volatile float huidu_steer_correction;
 
-/* 读取八路 GPIO，并更新 huidu_value[] 的亮灯状态。 */
+/* 读取八路 GPIO，并更新 huidu_value[] 的黑线检测状态。 */
 void huidu_get_value(void);
 
 /* 根据八路黑线重心执行连续转向 PID，并更新两路电机目标速度。 */
