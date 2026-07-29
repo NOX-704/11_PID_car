@@ -21,7 +21,7 @@ extern volatile uint8_t huidu_value[HUIDU_SENSOR_COUNT];
 extern volatile float huidu_line_error;
 extern volatile float huidu_steer_correction;
 
-/* 读取八路 GPIO，并更新 huidu_value[] 的黑线检测状态。 */
+/* 镜像读取八路 GPIO，并按车体从左到右更新黑线检测状态。 */
 void huidu_get_value(void);
 
 /* 根据八路黑线重心执行连续转向 PID，并更新两路电机目标速度。 */
