@@ -151,8 +151,7 @@ float heading_pid_update(
             s_target_yaw_deg + target_rate_dps * HEADING_PID_DT_S);
 
         /*
-         * 只有真正恢复直行并稳定 200 ms 才退出曲线模式，避免半圆中
-         * 传感器短暂居中时错误锁定当前航向。
+         * 正常出弯：循迹居中且角速度低于 4 dps，连续 200 ms。
          */
         if ((tracking_gear == 0) &&
             (heading_absf(gyro_z_dps) < CURVE_EXIT_RATE_DPS)) {
@@ -168,6 +167,22 @@ float heading_pid_update(
             s_integral = 0.0f;
             s_curve_exit_ticks = 0U;
             target_rate_dps = 0.0f;
+        }
+
+        /*
+         * 补充出弯：如果弯道上的航向误差超过 35 度，说明弯道模型
+         * 已严重偏离实际，强制切回直线模式并锁定当前航向。
+         */
+        if (s_mode == HEADING_MODE_CURVE) {
+            float curve_heading_error = heading_wrap_error(
+                s_target_yaw_deg - current_yaw);
+            if (heading_absf(curve_heading_error) > 35.0f) {
+                s_mode = HEADING_MODE_STRAIGHT;
+                s_target_yaw_deg = current_yaw;
+                s_integral = 0.0f;
+                s_curve_exit_ticks = 0U;
+                target_rate_dps = 0.0f;
+            }
         }
     }
 
