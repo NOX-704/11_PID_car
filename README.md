@@ -10,7 +10,7 @@
 
 | PCB 接口 | 用途 | MSPM0G3507 引脚 |
 |---|---|---|
-| H1/H6/H7 | OLED、MPU6050 等共享 I²C1 | PB2=SCL，PB3=SDA |
+| H1/H6/H7 | OLED 等外设共享 I²C1 | PB2=SCL，PB3=SDA |
 | H2-3～H2-10 | 八路数字循迹 L1、L2、L3、L4、R1、R2、R3、R4 | PA18、PA16、PB7、PA17、PA21、PA22、PA24、PA2 |
 | H3 | 舵机 PWM / 5V / GND | PA27 |
 | H4 | 调试串口 TX / RX / GND | PA28、PA31 |
@@ -31,7 +31,7 @@
 | UART 调试输出 | TX 启用 | H4 / PA28，115200 8N1，每 500 ms 输出一次八路逻辑值 |
 | UART 接收 | 仅配置 | SysConfig 配置了 RX 中断，但 NVIC 和处理代码未启用 |
 | K230 UART3 | 引脚已配置 | H5：PA25=RX、PA26=TX，9600 8N1；当前工程尚未解析视觉协议 |
-| MPU6050 / 扩展 I²C1 | 启用 | PB2=SCL、PB3=SDA，400 kHz；与三个 4Pin I²C 接口共用 |
+| 扩展 I²C1 | 引脚已配置 | PB2=SCL、PB3=SDA，400 kHz；与三个 4Pin I²C 接口共用 |
 | 舵机 PWM | 仅初始化 | PA27、50 Hz，启动时比较值为 `50`，没有动态控制 |
 | LED0/LED1 | 仅配置 | PA14/PA15，当前没有运行时控制 |
 | 启动按键 | 引脚已配置 | SW1 / PB6，内部下拉、高电平按下；当前尚未接入开始/停止状态机 |
@@ -47,8 +47,7 @@
 2. 启用 GPIOB 中断，计划用于两个编码器 A 相计数。
 3. 启动 TIMG7 舵机 PWM，并把比较值设为 `50`。
 4. 把两路目标速度清零。
-5. 在 PB2/PB3 的 I²C1 总线上初始化 MPU6050。
-6. `motor_init(3)` 初始化 TB6612FNG A/B 通道，启动 TIMG0 电机 PWM 和 TIMA0 10 ms 控制定时器。
+5. `motor_init(3)` 初始化 TB6612FNG A/B 通道，启动 TIMG0 电机 PWM 和 TIMA0 10 ms 控制定时器。
 
 运行阶段包含两条并行路径：
 
@@ -185,7 +184,7 @@ PWM(k) = move_toward(PWM(k-1), PWM_request(k), 200)
 | 调试串口 RX / H4-2 | 外接 3.3 V USB-UART | PA31 | PINCM6 | UART0_RX | 当前接收处理未启用 |
 | K230 UART RX / H5-2 | 亚博 K230 通信座 TXD / IO9 | PA25 | PINCM55 | UART3_RX | K230 → 小车，9600 8N1 |
 | K230 UART TX / H5-1 | 亚博 K230 通信座 RXD / IO10 | PA26 | PINCM59 | UART3_TX | 小车 → K230，当前仅预留 |
-| I²C1 SCL / H1、H6、H7 | MPU6050、OLED 等 | PB2 | PINCM15 | I2C1_SCL | 400 kHz，模块侧需有 3.3 V 上拉 |
+| I²C1 SCL / H1、H6、H7 | OLED 等 I²C 外设 | PB2 | PINCM15 | I2C1_SCL | 400 kHz，模块侧需有 3.3 V 上拉 |
 | I²C1 SDA / H1、H6、H7 | 同上 | PB3 | PINCM16 | I2C1_SDA | 400 kHz，模块侧需有 3.3 V 上拉 |
 | 启动按键 / SW1 | 板载按键 | PB6 | PINCM23 | GPIO 输入 | 内部下拉，按下接 3.3 V |
 | 舵机 PWM / H3-1 | 具体型号未注明 | PA27 | PINCM60 | TIMG7_CCP1 | 50 Hz，当前无动态控制 |
@@ -219,7 +218,6 @@ PWM(k) = move_toward(PWM(k-1), PWM_request(k), 200)
 │   ├── delay.c/.h                 # 阻塞毫秒延时
 │   ├── huidu.c/.h                 # 八路 GPIO 读取和循迹规则
 │   ├── key.c/.h                   # 当前只保留编码器 GPIOB 中断计数
-│   ├── MPU6050.c/.h               # PB2/PB3 I²C1 陀螺仪与转角控制
 │   ├── motor.c/.h                 # TB6612FNG、测速和双路增量式 PID
 │   └── uart.c/.h                  # 阻塞式 UART 发送
 ├── .vscode/c_cpp_properties.json  # Mac/Windows 共享 IntelliSense 配置
@@ -316,7 +314,7 @@ macOS 系统自带的 GNU Make 3.81 不支持 CCS 生成文件使用的 `-Onone`
 - `empty.syscfg` 干净生成成功，UART0、UART3、I²C1、8 路 `XUNJI`、SW1、电机、编码器和舵机之间没有引脚冲突。
 - 生成结果确认 K230 为 PA25/PA26 UART3 9600、调试口为 PA28/PA31 UART0 115200、共享 I²C1 为 PB2/PB3 400 kHz。
 - `Makefile` 会逐项核对 PCB 关键端口、引脚、外设实例和波特率，任何后续误改都会让 `make check` 失败。
-- `main.c`、全部 `user_driver/*.c`（包括 MPU6050）和生成的 `ti_msp_dl_config.c` 对象编译均为 0 报错。
+- `main.c`、全部 `user_driver/*.c` 和生成的 `ti_msp_dl_config.c` 对象编译均为 0 报错。
 
 以上结果证明当前工程能够干净生成 SysConfig 并通过对象编译，但不等同于烧录或实车功能验证。本次检查未覆盖完整链接，烧录前仍应在当前电脑上重新执行一次检查和 CCS Clean/Rebuild。
 
@@ -359,7 +357,7 @@ TX 与 RX 必须交叉，且两板必须共地。`empty.syscfg` 已初始化 `K2
 5. 核对编码器 A/B 相；当前 A 通道已经改为 PB8/PB9，不再是 PB13/PA22。
 6. 确认核心板已实际引出 PA2，且 R4 在白底/黑带上都能可靠翻转。
 7. 确认 H4 的 PA28/PA31 接 3.3 V USB-UART，H5 的 PA25/PA26 与 K230 TX/RX 交叉。
-8. 确认 PB2/PB3 I²C 总线存在到 3.3 V 的上拉，并让 OLED、MPU6050 等设备地址互不冲突。
+8. 确认 PB2/PB3 I²C 总线存在到 3.3 V 的上拉，并让所接 I²C 设备地址互不冲突。
 9. 确认 PA19/PA20 只用于 J-Link SWD。
 10. 通过“SysConfig 生成 → PCB 宏检查 → 对象编译”后再烧录。
 11. 第一次运行时架空车轮，因为电机控制定时器会在初始化后立即启动。
