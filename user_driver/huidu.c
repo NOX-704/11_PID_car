@@ -11,13 +11,13 @@
  * 在此基础上只增加平滑修正，不再保留旧的纯循迹转向 PID。
  */
 #define TRACK_STRAIGHT_SPEED        (300.0f)
-#define TRACK_INNER_SPEED           (225.0f)
-#define TRACK_OUTER_SPEED_1         (315.0f)
-#define TRACK_OUTER_SPEED_2         (345.0f)
-#define TRACK_OUTER_SPEED_3         (420.0f)
-#define TRACK_OUTER_SPEED_4         (570.0f)
+#define TRACK_INNER_SPEED           (240.0f)
+#define TRACK_OUTER_SPEED_1         (310.0f)
+#define TRACK_OUTER_SPEED_2         (340.0f)
+#define TRACK_OUTER_SPEED_3         (400.0f)
+#define TRACK_OUTER_SPEED_4         (500.0f)
 #define TRACK_MAX_OFFSET_LEVEL      (4U)
-#define TRACK_TARGET_SPEED_MAX      (780.0f)
+#define TRACK_TARGET_SPEED_MAX      (700.0f)
 
 /*
  * 新档位必须连续出现 3 个 10 ms 控制周期才生效。
