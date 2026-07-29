@@ -2,12 +2,11 @@
 #include "huidu.h"
 
 /*
- * 电机 PWM 周期为 4000。灰度循迹中断周期为 5 ms，但编码器测速、
- * 速度 PI 和 PWM 斜坡仍每两个节拍运行一次，即保持原来的 10 ms。
- * 每次速度环最多改变 80；从 0 到 4000 约需 0.5 s。
+ * 电机 PWM 周期为 4000。灰度循迹中断周期为 5 ms，编码器测速和
+ * 速度 PI 每两个节拍运行一次，即保持 10 ms。速度 PI 的请求值经过
+ * 0~4000 限幅后直接写入 PWM，不再增加额外的 PWM 变化斜坡。
  */
 #define MOTOR_PWM_MAX_DUTY  (4000)
-#define MOTOR_PWM_RAMP_STEP (80)
 
 /*
  * 双轮编码器只负责让实际轮速跟随航向控制给出的左右目标。原来的
@@ -57,23 +56,6 @@ int limit_duty(int duty)
         duty = 0;
     }
     return duty;
-}
-
-/**
- * 限制一次 10 ms 控制周期内的实际 PWM 变化量。
- *
- * 循迹外环更新目标轮速差，最终写入 TB6612 的 PWM 每次仍最多
- * 变化 80，避免档位切换和航向 PID 修正形成 PWM 硬阶跃。
- */
-static int motor_ramp_duty(int current_duty, int requested_duty)
-{
-    if (requested_duty > current_duty + MOTOR_PWM_RAMP_STEP) {
-        return current_duty + MOTOR_PWM_RAMP_STEP;
-    }
-    if (requested_duty < current_duty - MOTOR_PWM_RAMP_STEP) {
-        return current_duty - MOTOR_PWM_RAMP_STEP;
-    }
-    return requested_duty;
 }
 
 void motor_set_duty(uint8_t motor_id, uint32_t duty)
@@ -172,7 +154,7 @@ static void motor_speed_pi_update(uint8_t motor_id)
             MOTOR_SPEED_PI_KI * error);
         s_last_speed_error_1 = error;
         requested_duty = limit_duty(PWM_1_duty + pid_delta);
-        PWM_1_duty = motor_ramp_duty(PWM_1_duty, requested_duty);
+        PWM_1_duty = requested_duty;
         motor_set_duty(motor_id, PWM_1_duty);
     }
     if (motor_id == 2) {
@@ -182,7 +164,7 @@ static void motor_speed_pi_update(uint8_t motor_id)
             MOTOR_SPEED_PI_KI * error);
         s_last_speed_error_2 = error;
         requested_duty = limit_duty(PWM_2_duty + pid_delta);
-        PWM_2_duty = motor_ramp_duty(PWM_2_duty, requested_duty);
+        PWM_2_duty = requested_duty;
         motor_set_duty(motor_id, PWM_2_duty);
     }
 }

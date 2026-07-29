@@ -142,7 +142,7 @@ L1  L2  L3  L4  |  R1  R2  R3  R4
 
 当前 `TRACK_GEAR_CONFIRM_TICKS=1`，新档位经过一个 5 ms 循迹周期立即生效。若相邻档位容易抖动，建议改为 `2~5`，对应 10~25 ms。直行也参与相同确认；八路全黑停车立即生效，第 4 档后的八路全白仍保持最高档并清除候选换档计数。
 
-实际 PWM 由 `motor.c` 的速度 PI 和每 10 ms 最大变化 `80` 的输出斜坡控制，因此档位切换和航向修正不会直接形成 PWM 满幅阶跃。
+实际 PWM 由 `motor.c` 的速度 PI 每 10 ms 更新一次。PI 请求值只经过 `0~4000` 限幅后直接写入 PWM，不再经过额外的 PWM 斜坡限制；MPU6050 航向修正自身仍保留每 5 ms 最大变化 `3 mm/s` 的目标轮速平滑。
 
 阶梯参数集中在 `user_driver/huidu.c` 顶部：
 
@@ -174,7 +174,7 @@ L1  L2  L3  L4  |  R1  R2  R3  R4
 | 航向 PID `Ki` | `0.0` |
 | 航向 PID `Kd` | `2.0` |
 | PWM 限幅 | `0~4000` |
-| PWM 单周期最大变化 | `80 / 10 ms` |
+| PWM更新方式 | 速度PI请求值限幅后直接写入 |
 | TIMG0 比较值 | 与逻辑 PWM duty 相同 |
 
 速度计算公式为：
@@ -190,7 +190,7 @@ e(k) = target_speed - measured_speed
 ΔPWM = Kp × [e(k)-e(k-1)]
      + Ki × e(k)
 PWM_request(k) = clamp(PWM(k-1) + ΔPWM, 0, 4000)
-PWM(k) = move_toward(PWM(k-1), PWM_request(k), 80)
+PWM(k) = PWM_request(k)
 ```
 
 两个编码器的 B 相都只配置为普通输入，没有参与计数或正交方向判断。因此当前只能统计 A 相上升沿数量，不能得到有符号速度。
