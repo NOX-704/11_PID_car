@@ -2,9 +2,9 @@
 #include "huidu.h"
 
 /*
- * 电机 PWM 周期为 4000，控制中断周期为 10 ms。
- * 每次最多改变 80；持续请求满量程时，从 0 到 4000 约需 50 次，
- * 即约 0.5 s。保留用户实车修改后的斜坡速度。
+ * 电机 PWM 周期为 4000。灰度循迹中断周期为 5 ms，但编码器测速、
+ * 速度 PI 和 PWM 斜坡仍每两个节拍运行一次，即保持原来的 10 ms。
+ * 每次速度环最多改变 80；从 0 到 4000 约需 0.5 s。
  */
 #define MOTOR_PWM_MAX_DUTY  (4000)
 #define MOTOR_PWM_RAMP_STEP (80)
@@ -19,6 +19,12 @@
 
 /* 由 10 ms 中断置位，主循环取走后执行一次 MPU6050 I2C 采样。 */
 static volatile uint8_t s_imu_sample_request = 0U;
+
+/*
+ * 5 ms 中断的二分频状态。灰度传感器和循迹外环每次都运行，编码器、
+ * 速度 PI 与 MPU6050 请求只在每两个节拍中的第二个节拍运行。
+ */
+static uint8_t s_speed_loop_divider = 0U;
 
 void motor_init(uint8_t motor_id)
 {
@@ -197,15 +203,25 @@ void CONTROL_LOOP_INST_IRQHandler(void)
     {
     case DL_TIMER_IIDX_LOAD:
         /*
-         * 中断内只执行无阻塞计算。MPU6050 I2C 采样由主循环完成，
-         * 防止总线超时把电机控制中断卡死。
+         * 灰度 GPIO 和循迹外环以 200 Hz 更新，让黑线位置变化最多
+         * 经过 5 ms 就能反映到左右目标轮速。
          */
-        s_imu_sample_request = 1U;
         adjust_motor();
-        calculate_speed(1);
-        motor_speed_pi_update(1);
-        calculate_speed(2);
-        motor_speed_pi_update(2);
+
+        s_speed_loop_divider++;
+        if (s_speed_loop_divider >= 2U) {
+            s_speed_loop_divider = 0U;
+
+            /*
+             * 编码器和速度 PI 保持 100 Hz，避免 5 ms 内脉冲太少造成
+             * 轮速量化跳动。阻塞式 MPU6050 I2C 仍交给主循环执行。
+             */
+            s_imu_sample_request = 1U;
+            calculate_speed(1);
+            motor_speed_pi_update(1);
+            calculate_speed(2);
+            motor_speed_pi_update(2);
+        }
         break;
 
     default:

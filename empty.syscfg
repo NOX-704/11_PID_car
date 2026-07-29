@@ -179,14 +179,14 @@ SYSCTL.forceDefaultClkConfig = true;
 SYSCTL.clockTreeEn           = true;
 
 /*
- * 10 ms 总控制节拍：循迹、MPU 航向 PID、编码器测速和双轮速度 PI
- * 共用该周期，但阻塞式 MPU6050 I2C 读取始终放在主循环执行。
+ * 5 ms 总控制节拍：灰度循迹和航向 PID 以 200 Hz 运行；编码器测速、
+ * 双轮速度 PI 和 MPU6050 读取每两个节拍运行一次，继续保持 100 Hz。
  */
 TIMER1.$name              = "CONTROL_LOOP";
 TIMER1.timerMode          = "PERIODIC_UP";
 TIMER1.timerClkPrescale   = 100;
 TIMER1.interrupts         = ["LOAD"];
-TIMER1.timerPeriod        = "10ms";
+TIMER1.timerPeriod        = "5ms";
 TIMER1.peripheral.$assign = "TIMA0";
 
 /* PCB V1.0 H4: external 3.3 V USB-UART debug connector. */

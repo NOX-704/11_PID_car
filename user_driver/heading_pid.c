@@ -18,10 +18,10 @@
 #define HEADING_PID_KP                   (2.0f)
 #define HEADING_PID_KI                   (0.0f)
 #define HEADING_PID_KD                   (1.0f)
-#define HEADING_PID_DT_S                 (0.01f)
+#define HEADING_PID_DT_S                 (0.005f)
 #define HEADING_PID_INTEGRAL_LIMIT       (20.0f)
 #define HEADING_PID_OUTPUT_LIMIT         (80.0f)
-#define HEADING_PID_OUTPUT_STEP          (6.0f)
+#define HEADING_PID_OUTPUT_STEP          (3.0f)
 
 /*
  * 胶囊轨迹两侧半圆半径为 0.5 m。曲线目标角速度根据车辆中心速度实时
@@ -34,12 +34,12 @@
 
 /*
  * 进入半圆：循迹达到 2 档，或实测角速度超过 8 dps。
- * 离开半圆：循迹居中且角速度低于 4 dps，连续 20 个周期（200 ms）。
+ * 离开半圆：循迹居中且角速度低于 4 dps，连续 40 个周期（200 ms）。
  */
 #define CURVE_ENTER_GEAR_LEVEL           (2)
 #define CURVE_ENTER_RATE_DPS             (8.0f)
 #define CURVE_EXIT_RATE_DPS              (4.0f)
-#define CURVE_EXIT_CONFIRM_TICKS         (20U)
+#define CURVE_EXIT_CONFIRM_TICKS         (40U)
 
 enum {
     HEADING_MODE_DISABLED = 0U,
@@ -72,7 +72,7 @@ static float heading_clampf(
     return value;
 }
 
-/** 限制每个 10 ms 周期的差速变化量，防止 PID 输出形成硬阶跃。 */
+/** 限制每个 5 ms 周期的差速变化量，防止 PID 输出形成硬阶跃。 */
 static float heading_move_toward(
     float current, float target, float maximum_step)
 {
