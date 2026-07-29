@@ -2,6 +2,13 @@
 #define HEADING_PID_H
 
 #include <stdint.h>
+#include <stdbool.h>
+
+enum {
+    HEADING_MODE_DISABLED = 0U,
+    HEADING_MODE_STRAIGHT = 1U,
+    HEADING_MODE_CURVE = 2U
+};
 
 /**
  * 初始化新的 MPU6050 航向 PID 状态。

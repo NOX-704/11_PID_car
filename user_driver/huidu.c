@@ -305,11 +305,13 @@ static void huidu_adjust_staircase(
     } else {
         error_magnitude = (uint16_t)
             ((weighted_error < 0) ? -weighted_error : weighted_error);
-        offset_level = huidu_select_offset_level(
-            error_magnitude, black_count);
-        if (offset_level == 0U) {
+        if (heading_pid_get_mode() == HEADING_MODE_STRAIGHT &&
+            s_applied_gear == 0 && black_count >= 2U &&
+            error_magnitude <= (uint16_t)(black_count + (black_count >> 1))) {
             requested_gear = 0;
         } else {
+            offset_level = huidu_select_offset_level(
+                error_magnitude, black_count);
             requested_gear = (weighted_error < 0) ?
                 -(int8_t) offset_level : (int8_t) offset_level;
         }

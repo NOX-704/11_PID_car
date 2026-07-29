@@ -41,11 +41,6 @@
 #define CURVE_EXIT_RATE_DPS              (4.0f)
 #define CURVE_EXIT_CONFIRM_TICKS         (20U)
 
-enum {
-    HEADING_MODE_DISABLED = 0U,
-    HEADING_MODE_STRAIGHT = 1U,
-    HEADING_MODE_CURVE = 2U
-};
 
 static uint8_t s_mode = HEADING_MODE_DISABLED;
 static uint8_t s_curve_exit_ticks = 0U;
