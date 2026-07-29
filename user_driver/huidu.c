@@ -7,23 +7,27 @@
 /*
  * ======================== 四档阶梯差速参数 ========================
  *
- * 阶梯差速继续负责根据黑线位置提供主要转弯量；MPU6050 航向 PID
- * 在此基础上只增加平滑修正，不再保留旧的纯循迹转向 PID。
+ * 车体中心速度近似为 (左轮+右轮)/2。四档内外轮速度之和都保持
+ * 760 mm/s，使直行和各档转弯的理论中心速度均约为 380 mm/s；
+ * 档位只扩大左右轮速差，不再通过单独加速外轮使整车越转越快。
  */
-#define TRACK_STRAIGHT_SPEED        (200.0f)
-#define TRACK_INNER_SPEED           (150.0f)
-#define TRACK_OUTER_SPEED_1         (220.0f)
-#define TRACK_OUTER_SPEED_2         (260.0f)
-#define TRACK_OUTER_SPEED_3         (360.0f)
-#define TRACK_OUTER_SPEED_4         (460.0f)
+#define TRACK_STRAIGHT_SPEED        (380.0f)
+#define TRACK_INNER_SPEED_1         (350.0f)
+#define TRACK_INNER_SPEED_2         (300.0f)
+#define TRACK_INNER_SPEED_3         (240.0f)
+#define TRACK_INNER_SPEED_4         (160.0f)
+#define TRACK_OUTER_SPEED_1         (410.0f)
+#define TRACK_OUTER_SPEED_2         (460.0f)
+#define TRACK_OUTER_SPEED_3         (520.0f)
+#define TRACK_OUTER_SPEED_4         (600.0f)
 #define TRACK_MAX_OFFSET_LEVEL      (4U)
-#define TRACK_TARGET_SPEED_MAX      (520.0f)
+#define TRACK_TARGET_SPEED_MAX      (700.0f)
 
 /*
- * 新档位必须连续出现 3 个 10 ms 控制周期才生效。
- * 增大可提高抗抖能力但会降低转向响应，减小则反应更快但更容易跳档。
+ * 当前设置为 1 个 5 ms 循迹周期立即换档。增大可提高抗抖能力但会
+ * 降低转向响应；200 Hz 下建议 2~5，对应 10~25 ms。
  */
-#define TRACK_GEAR_CONFIRM_TICKS    (3U)
+#define TRACK_GEAR_CONFIRM_TICKS    (1U)
 
 /*
  * 权重以 L4/R1 之间的车体中心为零点。
@@ -80,7 +84,7 @@ static uint8_t huidu_read_black_state(GPIO_Regs *port, uint32_t pin)
 /**
  * 根据黑线重心的平均绝对偏移选择第 1~4 档差速。
  *
- * 使用整数交叉比较，避免在 10 ms 中断中进行不必要的浮点除法。
+ * 使用整数交叉比较，避免在 5 ms 中断中进行不必要的浮点除法。
  */
 static uint8_t huidu_select_offset_level(
     uint16_t error_magnitude, uint8_t black_count)
@@ -109,6 +113,21 @@ static float huidu_get_outer_speed(uint8_t offset_level)
         return TRACK_OUTER_SPEED_3;
     default:
         return TRACK_OUTER_SPEED_4;
+    }
+}
+
+/** 返回指定偏移档位对应的弯道内侧轮目标速度。 */
+static float huidu_get_inner_speed(uint8_t offset_level)
+{
+    switch (offset_level) {
+    case 1U:
+        return TRACK_INNER_SPEED_1;
+    case 2U:
+        return TRACK_INNER_SPEED_2;
+    case 3U:
+        return TRACK_INNER_SPEED_3;
+    default:
+        return TRACK_INNER_SPEED_4;
     }
 }
 
@@ -200,6 +219,7 @@ static int8_t huidu_confirm_staircase_gear(int8_t requested_gear)
 static void huidu_apply_staircase_gear(int8_t applied_gear)
 {
     uint8_t offset_level;
+    float inner_speed;
     float outer_speed;
 
     if (applied_gear == 0) {
@@ -210,16 +230,17 @@ static void huidu_apply_staircase_gear(int8_t applied_gear)
 
     offset_level = (uint8_t)
         ((applied_gear < 0) ? -applied_gear : applied_gear);
+    inner_speed = huidu_get_inner_speed(offset_level);
     outer_speed = huidu_get_outer_speed(offset_level);
 
     if (applied_gear < 0) {
         /* 黑线偏左：右轮为外侧轮。 */
         huidu_set_staircase_command(
-            outer_speed, TRACK_INNER_SPEED, applied_gear);
+            outer_speed, inner_speed, applied_gear);
     } else {
         /* 黑线偏右：左轮为外侧轮。 */
         huidu_set_staircase_command(
-            TRACK_INNER_SPEED, outer_speed, applied_gear);
+            inner_speed, outer_speed, applied_gear);
     }
 }
 
