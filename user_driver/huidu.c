@@ -85,11 +85,6 @@ static uint8_t huidu_read_black_state(GPIO_Regs *port, uint32_t pin)
 static uint8_t huidu_select_offset_level(
     uint16_t error_magnitude, uint8_t black_count)
 {
-    if (black_count >= 2U) {
-        if (error_magnitude <= (uint16_t)(black_count + (black_count >> 1))) {
-            return 0U;
-        }
-    }
     if (error_magnitude <= (uint16_t) black_count) {
         return 1U;
     }
@@ -188,6 +183,12 @@ static int8_t huidu_confirm_staircase_gear(int8_t requested_gear)
     }
 
     if (requested_gear == s_applied_gear) {
+        huidu_cancel_pending_gear();
+        return s_applied_gear;
+    }
+
+    if (s_applied_gear == 0 && requested_gear != 0) {
+        s_applied_gear = (requested_gear > 0) ? 1 : -1;
         huidu_cancel_pending_gear();
         return s_applied_gear;
     }

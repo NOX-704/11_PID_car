@@ -36,8 +36,8 @@
  * 进入半圆：循迹达到 2 档，或实测角速度超过 8 dps。
  * 离开半圆：循迹居中且角速度低于 4 dps，连续 20 个周期（200 ms）。
  */
-#define CURVE_ENTER_GEAR_LEVEL           (2)
-#define CURVE_ENTER_RATE_DPS             (8.0f)
+#define CURVE_ENTER_GEAR_LEVEL           (1)
+#define CURVE_ENTER_RATE_DPS             (5.0f)
 #define CURVE_EXIT_RATE_DPS              (4.0f)
 #define CURVE_EXIT_CONFIRM_TICKS         (20U)
 
