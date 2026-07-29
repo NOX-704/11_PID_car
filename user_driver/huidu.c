@@ -9,18 +9,40 @@
  */
 #define TRACK_CONTROL_PERIOD_S      (0.01f)
 #define TRACK_BASE_SPEED            (260.0f)
-#define TRACK_MIN_SPEED             (140.0f)
-#define TRACK_MAX_SPEED             (380.0f)
+#define TRACK_MIN_SPEED             (120.0f)
+#define TRACK_MAX_SPEED             (400.0f)
 
 /*
- * 横向误差 PID 初始参数。
+ * ======================== 转向 PID 实车调参区 ========================
  *
  * 误差范围约为 -4.0~+4.0：负值表示黑线偏左，正值表示黑线偏右。
- * Kp 决定转向力度；Ki 只消除长期机械偏置；Kd 用于提前抑制过冲。
+ * 每次只改一个参数，每次 Kp 改 2~4、Kd 改 0.02~0.04，便于判断效果。
+ *
+ * 1. 转向不足、压到外侧探头仍转不过来：
+ *    先增大 TRACK_PID_KP；若 huidu_steer_correction 已经到达限幅，
+ *    再增大 TRACK_CORRECTION_LIMIT，并同步放宽 MIN/MAX_SPEED。
+ *
+ * 2. 转向力度够，但建立得太慢：
+ *    增大 TRACK_CORRECTION_STEP。它只控制每 10 ms 差速能变化多少，
+ *    数值过大会重新出现左右跳变。
+ *
+ * 3. 沿黑线规律性 S 形摆动：
+ *    先减小 TRACK_PID_KP；仍有过冲再小幅增大 TRACK_PID_KD。
+ *    若是传感器 0/1 快速跳变，可减小 TRACK_ERROR_FILTER_ALPHA。
+ *
+ * 4. 入弯及时，但出弯后继续朝原方向转：
+ *    增大 TRACK_PID_KD，或减小 TRACK_PID_KI。
+ *
+ * 5. 长直道一直轻微偏向同一侧：
+ *    最后才小幅增大 TRACK_PID_KI；Ki 过大会产生慢速左右摆动。
+ *
+ * 当前值是针对“转向不足”的第一轮加强：
+ * Kp 由 20 提到 32，Kd 由 0.12 提到 0.16，最大差速修正由 100
+ * 提到 140，差速步进由 8 提到 12。Ki 保持较小，避免低频摆动。
  */
-#define TRACK_PID_KP                (20.0f)
+#define TRACK_PID_KP                (32.0f)
 #define TRACK_PID_KI                (2.0f)
-#define TRACK_PID_KD                (0.12f)
+#define TRACK_PID_KD                (0.16f)
 #define TRACK_PID_INTEGRAL_LIMIT    (2.0f)
 
 /*
@@ -29,8 +51,8 @@
  */
 #define TRACK_ERROR_FILTER_ALPHA    (0.25f)
 #define TRACK_CENTER_DEADBAND       (0.05f)
-#define TRACK_CORRECTION_LIMIT      (100.0f)
-#define TRACK_CORRECTION_STEP       (8.0f)
+#define TRACK_CORRECTION_LIMIT      (140.0f)
+#define TRACK_CORRECTION_STEP       (12.0f)
 
 /*
  * 中心黑线位于 L4/R1 间隙时可能出现八路全白。若全白前黑线已经明显
