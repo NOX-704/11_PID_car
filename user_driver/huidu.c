@@ -4,25 +4,46 @@
 #include "ti_msp_dl_config.h"
 
 /*
- * 使用当前实车调整后的差速参数：直行为 200、内侧通道为 150，
- * 黑带越靠外，外侧通道依次提高到 220、260、320、420。
+ * 循迹转向环每 10 ms 执行一次。它只根据八路探头的黑线横向位置
+ * 计算左右轮目标速度差；每个车轮仍由 motor.c 的编码器速度 PID 闭环。
  */
-#define TRACK_STRAIGHT_SPEED (200.0f)
-#define TRACK_INNER_SPEED    (150.0f)
-#define TRACK_OUTER_SPEED_1  (220.0f)
-#define TRACK_OUTER_SPEED_2  (260.0f)
-#define TRACK_OUTER_SPEED_3  (320.0f)
-#define TRACK_OUTER_SPEED_4  (420.0f)
+#define TRACK_CONTROL_PERIOD_S      (0.01f)
+#define TRACK_BASE_SPEED            (260.0f)
+#define TRACK_MIN_SPEED             (140.0f)
+#define TRACK_MAX_SPEED             (380.0f)
 
 /*
- * 第 3、4 档表示黑带已经明显偏到外侧。此时若下一帧八路全亮，
- * 更可能是车辆冲过胶带而不是胶带恰好居中，因此继续保持原转向。
+ * 横向误差 PID 初始参数。
+ *
+ * 误差范围约为 -4.0~+4.0：负值表示黑线偏左，正值表示黑线偏右。
+ * Kp 决定转向力度；Ki 只消除长期机械偏置；Kd 用于提前抑制过冲。
  */
-#define TRACK_LARGE_OFFSET_LEVEL (3U)
+#define TRACK_PID_KP                (20.0f)
+#define TRACK_PID_KI                (2.0f)
+#define TRACK_PID_KD                (0.12f)
+#define TRACK_PID_INTEGRAL_LIMIT    (2.0f)
+
+/*
+ * 数字探头会让误差出现离散跳变。先对误差做一阶低通，再限制每个
+ * 控制周期的差速变化量，避免差速在左右两侧之间瞬间翻转。
+ */
+#define TRACK_ERROR_FILTER_ALPHA    (0.25f)
+#define TRACK_CENTER_DEADBAND       (0.05f)
+#define TRACK_CORRECTION_LIMIT      (100.0f)
+#define TRACK_CORRECTION_STEP       (8.0f)
+
+/*
+ * 中心黑线位于 L4/R1 间隙时可能出现八路全亮。若全亮前黑线已经明显
+ * 偏到一侧，先保持 150 ms 原方向寻找黑线，随后逐步衰减回直行，
+ * 防止丢线后永久保持大差速。
+ */
+#define TRACK_LOST_TRIGGER_ERROR    (2.0f)
+#define TRACK_LOST_HOLD_TICKS       (15U)
+#define TRACK_LOST_ERROR_DECAY      (0.85f)
 
 /*
  * 权重以 L4/R1 之间的车体中心为零点。
- * 负值表示黑带偏左，正值表示黑带偏右；绝对值越大，偏离中心越远。
+ * 通道顺序固定为 L1、L2、L3、L4、R1、R2、R3、R4。
  */
 static const int8_t s_black_position_weight[HUIDU_SENSOR_COUNT] = {
     -4, -3, -2, -1, 1, 2, 3, 4
@@ -34,13 +55,80 @@ static const int8_t s_black_position_weight[HUIDU_SENSOR_COUNT] = {
  */
 volatile uint8_t huidu_value[HUIDU_SENSOR_COUNT] = {0U};
 
+/*
+ * 暴露滤波后的横向误差和最终差速修正量，便于在 CCS Expressions
+ * 中观察和整定。它们只由 10 ms 控制中断写入。
+ */
+volatile float huidu_line_error = 0.0f;
+volatile float huidu_steer_correction = 0.0f;
+
 extern float target_speed_1;
 extern float target_speed_2;
 
-/* 最近一次非全亮状态的差速决策，供严重偏移后的全亮状态继续保持。 */
-static float s_last_command_speed_1 = TRACK_STRAIGHT_SPEED;
-static float s_last_command_speed_2 = TRACK_STRAIGHT_SPEED;
-static uint8_t s_last_offset_level = 0U;
+/* 转向 PID 内部状态。 */
+static float s_filtered_error = 0.0f;
+static float s_previous_error = 0.0f;
+static float s_error_integral = 0.0f;
+static float s_last_visible_error = 0.0f;
+static float s_applied_correction = 0.0f;
+static uint8_t s_has_line_history = 0U;
+static uint8_t s_lost_line_ticks = 0U;
+
+/**
+ * 返回浮点数绝对值，避免为简单运算引入额外数学库依赖。
+ */
+static float huidu_absf(float value)
+{
+    return (value < 0.0f) ? -value : value;
+}
+
+/**
+ * 把 value 限制在 [minimum, maximum] 内。
+ */
+static float huidu_clampf(float value, float minimum, float maximum)
+{
+    if (value < minimum) {
+        return minimum;
+    }
+    if (value > maximum) {
+        return maximum;
+    }
+    return value;
+}
+
+/**
+ * 限制一个控制周期内的变化量，防止差速修正突然反向。
+ */
+static float huidu_move_toward(
+    float current, float target, float maximum_step)
+{
+    if (target > current + maximum_step) {
+        return current + maximum_step;
+    }
+    if (target < current - maximum_step) {
+        return current - maximum_step;
+    }
+    return target;
+}
+
+/**
+ * 清除转向 PID 历史状态。
+ *
+ * 八路全黑等异常状态停车时必须清积分，否则重新找到黑线后会继承
+ * 停车前的转向偏置。
+ */
+static void huidu_reset_steering_pid(void)
+{
+    s_filtered_error = 0.0f;
+    s_previous_error = 0.0f;
+    s_error_integral = 0.0f;
+    s_last_visible_error = 0.0f;
+    s_applied_correction = 0.0f;
+    s_has_line_history = 0U;
+    s_lost_line_ticks = 0U;
+    huidu_line_error = 0.0f;
+    huidu_steer_correction = 0.0f;
+}
 
 /**
  * 读取单路循迹 GPIO，并转换为与物理指示灯一致的逻辑值。
@@ -54,64 +142,60 @@ static uint8_t huidu_read_lit_state(GPIO_Regs *port, uint32_t pin)
 }
 
 /**
- * 根据黑带重心距离选择旧版差速档位。
+ * 根据横向误差计算连续差速修正量。
  *
- * 使用“权重绝对值总和 / 不亮探头数量”的等价整数比较，避免在 10 ms
- * 中断中执行除法。平均偏移落在第 1~4 档时，返回对应的档位编号。
+ * 计算顺序：误差低通 → 积分限幅 → PID → 输出限幅 → 变化率限制。
+ * 返回值为正时黑线偏右，需要左轮加速、右轮减速；负值时相反。
  */
-static uint8_t huidu_select_offset_level(
-    uint16_t error_magnitude, uint8_t unlit_count)
+static float huidu_steering_pid_update(float raw_error)
 {
-    if (error_magnitude <= (uint16_t) unlit_count) {
-        return 1U;
-    }
-    if (error_magnitude <= (uint16_t) (2U * unlit_count)) {
-        return 2U;
-    }
-    if (error_magnitude <= (uint16_t) (3U * unlit_count)) {
-        return 3U;
-    }
-    return 4U;
-}
+    float derivative;
+    float requested_correction;
 
-/**
- * 把偏移档位转换为弯道外侧车轮的目标速度。
- */
-static float huidu_get_outer_speed(uint8_t offset_level)
-{
-    switch (offset_level) {
-    case 1U:
-        return TRACK_OUTER_SPEED_1;
-    case 2U:
-        return TRACK_OUTER_SPEED_2;
-    case 3U:
-        return TRACK_OUTER_SPEED_3;
-    default:
-        return TRACK_OUTER_SPEED_4;
-    }
-}
+    s_filtered_error += TRACK_ERROR_FILTER_ALPHA *
+        (raw_error - s_filtered_error);
 
-/**
- * 保存本次有效循迹决策，并立即更新速度 PID 的目标轮速。
- *
- * 目标轮速不能再做 200 ms 插值，否则最外档只短暂出现时，PID 看到的
- * 差速仍然很小。PWM 的 200 ms 平滑改由 motor.c 在实际输出层完成。
- */
-static void huidu_set_command(
-    float command_speed_1, float command_speed_2, uint8_t offset_level)
-{
-    s_last_command_speed_1 = command_speed_1;
-    s_last_command_speed_2 = command_speed_2;
-    s_last_offset_level = offset_level;
-    target_speed_1 = command_speed_1;
-    target_speed_2 = command_speed_2;
+    if (huidu_absf(s_filtered_error) <= TRACK_CENTER_DEADBAND) {
+        /*
+         * 已经接近中心时快速释放积分，避免一个很小的历史偏置让车辆
+         * 穿过中心后仍继续向原方向转动。
+         */
+        s_filtered_error = 0.0f;
+        s_error_integral *= 0.8f;
+    } else {
+        s_error_integral +=
+            s_filtered_error * TRACK_CONTROL_PERIOD_S;
+        s_error_integral = huidu_clampf(
+            s_error_integral,
+            -TRACK_PID_INTEGRAL_LIMIT,
+            TRACK_PID_INTEGRAL_LIMIT);
+    }
+
+    derivative = (s_filtered_error - s_previous_error) /
+        TRACK_CONTROL_PERIOD_S;
+    s_previous_error = s_filtered_error;
+
+    requested_correction =
+        TRACK_PID_KP * s_filtered_error +
+        TRACK_PID_KI * s_error_integral +
+        TRACK_PID_KD * derivative;
+    requested_correction = huidu_clampf(
+        requested_correction,
+        -TRACK_CORRECTION_LIMIT,
+        TRACK_CORRECTION_LIMIT);
+
+    s_applied_correction = huidu_move_toward(
+        s_applied_correction,
+        requested_correction,
+        TRACK_CORRECTION_STEP);
+
+    huidu_line_error = s_filtered_error;
+    huidu_steer_correction = s_applied_correction;
+    return s_applied_correction;
 }
 
 /**
  * 读取从 L1 到 R4 的八路传感器。
- *
- * 顺序固定为 L1、L2、L3、L4、R1、R2、R3、R4，便于串口输出和
- * 黑带位置权重一一对应。
  */
 void huidu_get_value(void)
 {
@@ -126,27 +210,23 @@ void huidu_get_value(void)
 }
 
 /**
- * 让不亮的探头尽量回到 L4/R1 之间的中心位置。
+ * 用八路黑线重心 PID 连续更新两路电机目标速度。
  *
- * 正常情况下，全亮表示黑带正好位于中心两路之间，应当直行。
- * 若全亮前处于第 3/4 档严重偏移，则保持原差速，直到再次出现不亮探头。
- * 若存在不亮探头，则使用其加权重心决定差速方向和强度。
- * 全灭时无法判断黑带中心，目标速度清零作为安全保护。
+ * 通道 1/A 为右轮，通道 2/B 为左轮：
+ *   correction < 0（黑线偏左）→ 右轮快、左轮慢；
+ *   correction > 0（黑线偏右）→ 右轮慢、左轮快。
  */
 void adjust_motor(void)
 {
     int16_t weighted_error = 0;
-    uint8_t unlit_count = 0U;
+    uint8_t black_count = 0U;
     uint8_t sensor_index;
-    uint8_t offset_level;
-    float outer_speed;
+    float raw_error;
+    float correction;
+    float right_target;
+    float left_target;
 
     huidu_get_value();
-
-    /*
-     * 保持旧版正转定义不变，只通过两路目标速度差进行转向，
-     * 避免本次循迹逻辑重写改变 TB6612 的方向接线语义。
-     */
     motor_set_direction(1U, 1U);
     motor_set_direction(2U, 1U);
 
@@ -155,53 +235,58 @@ void adjust_motor(void)
          sensor_index++) {
         if (huidu_value[sensor_index] == 0U) {
             weighted_error += s_black_position_weight[sensor_index];
-            unlit_count++;
+            black_count++;
         }
     }
 
     /*
-     * 严重偏移后突然全亮通常表示车身已经越过黑带。此时继续保持
-     * 上一次差速指令，直到任意一路再次熄灭；其他全亮情况直行。
+     * 八路全黑无法计算可靠重心，立即把目标速度清零并清除 PID 历史，
+     * 防止恢复时继承异常积分。
      */
-    if (unlit_count == 0U) {
-        if (s_last_offset_level >= TRACK_LARGE_OFFSET_LEVEL) {
-            target_speed_1 = s_last_command_speed_1;
-            target_speed_2 = s_last_command_speed_2;
+    if (black_count == HUIDU_SENSOR_COUNT) {
+        target_speed_1 = 0.0f;
+        target_speed_2 = 0.0f;
+        huidu_reset_steering_pid();
+        return;
+    }
+
+    if (black_count > 0U) {
+        /* 多路同时压线时使用平均位置，得到 -4.0~+4.0 连续误差。 */
+        raw_error = (float) weighted_error / (float) black_count;
+        s_last_visible_error = raw_error;
+        s_has_line_history = 1U;
+        s_lost_line_ticks = 0U;
+    } else if ((s_has_line_history != 0U) &&
+               (huidu_absf(s_last_visible_error) >=
+                TRACK_LOST_TRIGGER_ERROR)) {
+        /*
+         * 严重偏移后全亮可能是刚刚越过黑线。短时间保持原方向寻找，
+         * 超过 150 ms 后逐步衰减，避免旧差速无限锁住。
+         */
+        raw_error = s_last_visible_error;
+        if (s_lost_line_ticks < TRACK_LOST_HOLD_TICKS) {
+            s_lost_line_ticks++;
         } else {
-            huidu_set_command(
-                TRACK_STRAIGHT_SPEED, TRACK_STRAIGHT_SPEED, 0U);
+            s_last_visible_error *= TRACK_LOST_ERROR_DECAY;
+            raw_error = s_last_visible_error;
         }
-        return;
-    }
-
-    /* 八路全灭无法得到有效横向位置，停车避免盲目冲出赛道。 */
-    if (unlit_count == HUIDU_SENSOR_COUNT) {
-        huidu_set_command(0.0f, 0.0f, 0U);
-        return;
-    }
-
-    /*
-     * 不亮探头相对中心对称时重心误差为零，说明黑带已经居中，
-     * 两路使用相同目标速度直行。
-     */
-    if (weighted_error == 0) {
-        huidu_set_command(
-            TRACK_STRAIGHT_SPEED, TRACK_STRAIGHT_SPEED, 0U);
-        return;
-    }
-
-    offset_level = huidu_select_offset_level(
-        (uint16_t) ((weighted_error < 0) ? -weighted_error : weighted_error),
-        unlit_count);
-    outer_speed = huidu_get_outer_speed(offset_level);
-
-    /*
-     * 实车已确认：通道 1/A 是右轮，通道 2/B 是左轮。
-     * 黑带偏左时左轮减速、右轮加速；黑带偏右时反向分配。
-     */
-    if (weighted_error < 0) {
-        huidu_set_command(outer_speed, TRACK_INNER_SPEED, offset_level);
     } else {
-        huidu_set_command(TRACK_INNER_SPEED, outer_speed, offset_level);
+        /* 中心黑线位于 L4/R1 间隙时八路全亮，目标误差为零。 */
+        raw_error = 0.0f;
+        s_lost_line_ticks = 0U;
     }
+
+    correction = huidu_steering_pid_update(raw_error);
+
+    right_target = huidu_clampf(
+        TRACK_BASE_SPEED - correction,
+        TRACK_MIN_SPEED,
+        TRACK_MAX_SPEED);
+    left_target = huidu_clampf(
+        TRACK_BASE_SPEED + correction,
+        TRACK_MIN_SPEED,
+        TRACK_MAX_SPEED);
+
+    target_speed_1 = right_target;
+    target_speed_2 = left_target;
 }

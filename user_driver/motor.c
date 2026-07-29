@@ -45,8 +45,8 @@ int limit_duty(int duty)
 /**
  * 限制一次 10 ms 控制周期内的实际 PWM 变化量。
  *
- * PID 可以立即看到完整的目标轮速差，但最终写入 TB6612 的 PWM 每次
- * 最多变化 200。这样最外档差速能及时建立，同时避免 PWM 阶跃抖动。
+ * 循迹转向 PID 连续更新目标轮速差，最终写入 TB6612 的 PWM 每次仍
+ * 最多变化 200，形成第二层执行器保护，避免速度环输出出现硬阶跃。
  */
 static int motor_ramp_duty(int current_duty, int requested_duty)
 {

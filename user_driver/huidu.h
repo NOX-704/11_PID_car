@@ -17,10 +17,14 @@
  */
 extern volatile uint8_t huidu_value[HUIDU_SENSOR_COUNT];
 
+/* CCS 调参观察量：滤波后的黑线横向误差和当前左右轮差速修正。 */
+extern volatile float huidu_line_error;
+extern volatile float huidu_steer_correction;
+
 /* 读取八路 GPIO，并更新 huidu_value[] 的亮灯状态。 */
 void huidu_get_value(void);
 
-/* 根据不亮探头的加权位置更新两路电机目标速度。 */
+/* 根据八路黑线重心执行连续转向 PID，并更新两路电机目标速度。 */
 void adjust_motor(void);
 
 #endif
