@@ -15,9 +15,9 @@
  *   2. 再增加 KP，让偏离方向后能够回正；
  *   3. 只有确认零偏很小但仍存在固定方向误差时，才把 KI 从 0.01 开始加。
  */
-#define HEADING_PID_KP                   (2.0f)
+#define HEADING_PID_KP                   (1.0f)
 #define HEADING_PID_KI                   (0.0f)
-#define HEADING_PID_KD                   (1.0f)
+#define HEADING_PID_KD                   (2.0f)
 #define HEADING_PID_DT_S                 (0.005f)
 #define HEADING_PID_INTEGRAL_LIMIT       (20.0f)
 #define HEADING_PID_OUTPUT_LIMIT         (80.0f)
