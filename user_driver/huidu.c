@@ -19,22 +19,16 @@
  * ======================== 四档阶梯差速参数 ========================
  *
  * 直行为 200，弯道内侧轮固定为 150；黑线离中心越远，外侧轮依次
- * 提高到 220、260、320、420。要加强某一档转向，只提高对应 OUTER；
+ * 提高到 220、260、360、460。要加强某一档转向，只提高对应 OUTER；
  * 要整体减速，则同时降低 STRAIGHT、INNER 和四个 OUTER。
  */
 #define TRACK_STRAIGHT_SPEED        (200.0f)
 #define TRACK_INNER_SPEED           (150.0f)
 #define TRACK_OUTER_SPEED_1         (220.0f)
 #define TRACK_OUTER_SPEED_2         (260.0f)
-#define TRACK_OUTER_SPEED_3         (320.0f)
-#define TRACK_OUTER_SPEED_4         (420.0f)
-#define TRACK_LARGE_OFFSET_LEVEL    (3U)
-
-/*
- * 严重偏移后八路全白，可能是车辆刚越过黑线。最多保持旧差速 150 ms，
- * 随后回到直行，避免旧阶梯指令永久锁住。
- */
-#define TRACK_LOST_HOLD_TICKS       (15U)
+#define TRACK_OUTER_SPEED_3         (360.0f)
+#define TRACK_OUTER_SPEED_4         (460.0f)
+#define TRACK_MAX_OFFSET_LEVEL      (4U)
 
 #if TRACK_USE_STEERING_PID
 /*
@@ -56,6 +50,7 @@
 #define TRACK_CORRECTION_LIMIT      (140.0f)
 #define TRACK_CORRECTION_STEP       (12.0f)
 #define TRACK_LOST_TRIGGER_ERROR    (2.0f)
+#define TRACK_PID_LOST_HOLD_TICKS   (15U)
 #define TRACK_LOST_ERROR_DECAY      (0.85f)
 #endif
 
@@ -87,7 +82,6 @@ extern float target_speed_2;
 static float s_last_command_speed_1 = TRACK_STRAIGHT_SPEED;
 static float s_last_command_speed_2 = TRACK_STRAIGHT_SPEED;
 static uint8_t s_last_offset_level = 0U;
-static uint8_t s_lost_line_ticks = 0U;
 
 #if TRACK_USE_STEERING_PID
 /* 连续转向 PID 的内部状态；当前控制模式下不参与编译。 */
@@ -97,6 +91,7 @@ static float s_error_integral = 0.0f;
 static float s_last_visible_error = 0.0f;
 static float s_applied_correction = 0.0f;
 static uint8_t s_has_line_history = 0U;
+static uint8_t s_lost_line_ticks = 0U;
 #endif
 
 /**
@@ -296,31 +291,27 @@ static void huidu_adjust_staircase(
     /* 八路全黑无法判断黑线中心，停车并清除搜索历史。 */
     if (black_count == HUIDU_SENSOR_COUNT) {
         huidu_line_error = 0.0f;
-        s_lost_line_ticks = 0U;
         huidu_set_staircase_command(0.0f, 0.0f, 0U);
         return;
     }
 
     /*
      * 八路全白可能是黑线位于中心间隙，也可能是严重偏移后刚越线。
-     * 第 3/4 档之后只保持 150 ms，超时自动直行，避免永久锁死。
+     * 若上一状态是第 4 档最高差速，则一直保持原左右轮目标，直到
+     * 任意探头重新识别到黑线；第 1~3 档和直行状态遇到全白则直行。
      */
     if (black_count == 0U) {
-        if ((s_last_offset_level >= TRACK_LARGE_OFFSET_LEVEL) &&
-            (s_lost_line_ticks < TRACK_LOST_HOLD_TICKS)) {
+        if (s_last_offset_level == TRACK_MAX_OFFSET_LEVEL) {
             target_speed_1 = s_last_command_speed_1;
             target_speed_2 = s_last_command_speed_2;
-            s_lost_line_ticks++;
         } else {
             huidu_line_error = 0.0f;
-            s_lost_line_ticks = 0U;
             huidu_set_staircase_command(
                 TRACK_STRAIGHT_SPEED, TRACK_STRAIGHT_SPEED, 0U);
         }
         return;
     }
 
-    s_lost_line_ticks = 0U;
     huidu_line_error =
         (float) weighted_error / (float) black_count;
 
@@ -376,7 +367,7 @@ static void huidu_adjust_pid(
                (huidu_absf(s_last_visible_error) >=
                 TRACK_LOST_TRIGGER_ERROR)) {
         raw_error = s_last_visible_error;
-        if (s_lost_line_ticks < TRACK_LOST_HOLD_TICKS) {
+        if (s_lost_line_ticks < TRACK_PID_LOST_HOLD_TICKS) {
             s_lost_line_ticks++;
         } else {
             s_last_visible_error *= TRACK_LOST_ERROR_DECAY;
