@@ -30,6 +30,12 @@
 #define TRACK_OUTER_SPEED_4         (460.0f)
 #define TRACK_MAX_OFFSET_LEVEL      (4U)
 
+/*
+ * 新档位必须连续出现 3 个 10 ms 控制周期才生效。
+ * 增大可提高抗抖能力但会降低转向响应，减小则反应更快但更容易跳档。
+ */
+#define TRACK_GEAR_CONFIRM_TICKS    (3U)
+
 #if TRACK_USE_STEERING_PID
 /*
  * ======================== 已禁用的转向 PID 参数 ========================
@@ -78,7 +84,16 @@ volatile float huidu_steer_correction = 0.0f;
 extern float target_speed_1;
 extern float target_speed_2;
 
-/* 阶梯模式状态：记录上次有效偏移档位，用于最高档丢线搜索。 */
+/*
+ * 阶梯模式状态：
+ * - s_applied_gear：当前实际档位，负数左偏、正数右偏、0 为直行。
+ * - s_candidate_gear：等待确认的新档位。
+ * - s_candidate_ticks：新档位连续出现的控制周期数。
+ * - s_last_offset_level：当前实际档位的绝对值，用于最高档丢线保持。
+ */
+static int8_t s_applied_gear = 0;
+static int8_t s_candidate_gear = 0;
+static uint8_t s_candidate_ticks = 0U;
 static uint8_t s_last_offset_level = 0U;
 
 #if TRACK_USE_STEERING_PID
@@ -158,6 +173,83 @@ static void huidu_set_staircase_command(
     target_speed_1 = right_speed;
     target_speed_2 = left_speed;
     huidu_steer_correction = (left_speed - right_speed) * 0.5f;
+}
+
+/**
+ * 清除待确认档位，并把当前实际档位强制设置为指定值。
+ *
+ * 全黑停车和非最高档全白直行属于安全/确定状态，应立即生效而不等待防抖。
+ */
+static void huidu_reset_gear_debounce(int8_t applied_gear)
+{
+    s_applied_gear = applied_gear;
+    s_candidate_gear = applied_gear;
+    s_candidate_ticks = 0U;
+}
+
+/**
+ * 取消尚未完成的换档确认，但保持当前实际档位不变。
+ *
+ * 最高档丢线期间没有有效黑线样本，不能让丢线前的候选计数跨过丢线继续累加。
+ */
+static void huidu_cancel_pending_gear(void)
+{
+    s_candidate_gear = s_applied_gear;
+    s_candidate_ticks = 0U;
+}
+
+/**
+ * 对请求档位执行连续样本确认，并返回当前允许下发的实际档位。
+ */
+static int8_t huidu_confirm_staircase_gear(int8_t requested_gear)
+{
+    if (requested_gear == s_applied_gear) {
+        huidu_cancel_pending_gear();
+        return s_applied_gear;
+    }
+
+    if (requested_gear != s_candidate_gear) {
+        s_candidate_gear = requested_gear;
+        s_candidate_ticks = 1U;
+    } else if (s_candidate_ticks < TRACK_GEAR_CONFIRM_TICKS) {
+        s_candidate_ticks++;
+    }
+
+    if (s_candidate_ticks >= TRACK_GEAR_CONFIRM_TICKS) {
+        s_applied_gear = requested_gear;
+        huidu_cancel_pending_gear();
+    }
+
+    return s_applied_gear;
+}
+
+/**
+ * 把带方向的实际档位转换为左右轮目标速度。
+ */
+static void huidu_apply_staircase_gear(int8_t applied_gear)
+{
+    uint8_t offset_level;
+    float outer_speed;
+
+    if (applied_gear == 0) {
+        huidu_set_staircase_command(
+            TRACK_STRAIGHT_SPEED, TRACK_STRAIGHT_SPEED, 0U);
+        return;
+    }
+
+    offset_level = (uint8_t)
+        ((applied_gear < 0) ? -applied_gear : applied_gear);
+    outer_speed = huidu_get_outer_speed(offset_level);
+
+    if (applied_gear < 0) {
+        /* 黑线偏左：右轮为外侧轮。 */
+        huidu_set_staircase_command(
+            outer_speed, TRACK_INNER_SPEED, offset_level);
+    } else {
+        /* 黑线偏右：左轮为外侧轮。 */
+        huidu_set_staircase_command(
+            TRACK_INNER_SPEED, outer_speed, offset_level);
+    }
 }
 
 #if TRACK_USE_STEERING_PID
@@ -286,11 +378,13 @@ static void huidu_adjust_staircase(
 {
     uint16_t error_magnitude;
     uint8_t offset_level;
-    float outer_speed;
+    int8_t requested_gear;
+    int8_t applied_gear;
 
-    /* 八路全黑无法判断黑线中心，停车并清除搜索历史。 */
+    /* 八路全黑无法判断黑线中心，立即停车并清除档位历史。 */
     if (black_count == HUIDU_SENSOR_COUNT) {
         huidu_line_error = 0.0f;
+        huidu_reset_gear_debounce(0);
         huidu_set_staircase_command(0.0f, 0.0f, 0U);
         return;
     }
@@ -303,9 +397,11 @@ static void huidu_adjust_staircase(
      */
     if (black_count == 0U) {
         if (s_last_offset_level == TRACK_MAX_OFFSET_LEVEL) {
+            huidu_cancel_pending_gear();
             return;
         } else {
             huidu_line_error = 0.0f;
+            huidu_reset_gear_debounce(0);
             huidu_set_staircase_command(
                 TRACK_STRAIGHT_SPEED, TRACK_STRAIGHT_SPEED, 0U);
         }
@@ -315,30 +411,24 @@ static void huidu_adjust_staircase(
     huidu_line_error =
         (float) weighted_error / (float) black_count;
 
-    /* 黑线重心对称时按直线速度运行。 */
+    /* 先计算请求档位；方向与档位共同参与防抖确认。 */
     if (weighted_error == 0) {
-        huidu_set_staircase_command(
-            TRACK_STRAIGHT_SPEED, TRACK_STRAIGHT_SPEED, 0U);
-        return;
+        requested_gear = 0;
+    } else {
+        error_magnitude = (uint16_t)
+            ((weighted_error < 0) ? -weighted_error : weighted_error);
+        offset_level = huidu_select_offset_level(
+            error_magnitude, black_count);
+        requested_gear = (weighted_error < 0) ?
+            -(int8_t) offset_level : (int8_t) offset_level;
     }
-
-    error_magnitude = (uint16_t)
-        ((weighted_error < 0) ? -weighted_error : weighted_error);
-    offset_level = huidu_select_offset_level(
-        error_magnitude, black_count);
-    outer_speed = huidu_get_outer_speed(offset_level);
 
     /*
-     * 黑线偏左：右轮为外侧轮，右轮加速、左轮保持 150。
-     * 黑线偏右：左轮为外侧轮，左轮加速、右轮保持 150。
+     * 只有同一带方向档位连续出现 TRACK_GEAR_CONFIRM_TICKS 次才切换；
+     * 确认期间继续使用原档位，避免相邻探头抖动造成左右反复跳变。
      */
-    if (weighted_error < 0) {
-        huidu_set_staircase_command(
-            outer_speed, TRACK_INNER_SPEED, offset_level);
-    } else {
-        huidu_set_staircase_command(
-            TRACK_INNER_SPEED, outer_speed, offset_level);
-    }
+    applied_gear = huidu_confirm_staircase_gear(requested_gear);
+    huidu_apply_staircase_gear(applied_gear);
 }
 
 #if TRACK_USE_STEERING_PID

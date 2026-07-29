@@ -3,11 +3,11 @@
 
 /*
  * 电机 PWM 周期为 4000，控制中断周期为 10 ms。
- * 每次最多改变 200；持续请求满量程时，从 0 到 4000 需要 20 次，
- * 即 200 ms。较小的 PWM 变化会按相同斜率更早完成。
+ * 每次最多改变 30；持续请求满量程时，从 0 到 4000 约需 134 次，
+ * 即约 1.34 s。较小的 PWM 变化会按相同斜率更早完成。
  */
 #define MOTOR_PWM_MAX_DUTY  (4000)
-#define MOTOR_PWM_RAMP_STEP (200)
+#define MOTOR_PWM_RAMP_STEP (30)
 
 void motor_init(uint8_t motor_id)
 {
@@ -46,7 +46,7 @@ int limit_duty(int duty)
  * 限制一次 10 ms 控制周期内的实际 PWM 变化量。
  *
  * 循迹外环更新阶梯目标轮速差，最终写入 TB6612 的 PWM 每次仍最多
- * 变化 200，避免档位切换时速度环输出直接形成 PWM 硬阶跃。
+ * 变化 30，避免档位切换时速度环输出直接形成 PWM 硬阶跃。
  */
 static int motor_ramp_duty(int current_duty, int requested_duty)
 {
