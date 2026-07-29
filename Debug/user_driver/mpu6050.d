@@ -1,6 +1,7 @@
 # FIXED
 
-main.o: ../main.c \
+user_driver/mpu6050.o: ../user_driver/mpu6050.c ../user_driver/mpu6050.h \
+ ../user_driver/delay.h \
  ti_msp_dl_config.h \
  /Users/rylum/ti/mspm0_sdk_2_10_00_04/source/ti/devices/msp/msp.h \
  /Users/rylum/ti/mspm0_sdk_2_10_00_04/source/ti/devices/DeviceFamily.h \
@@ -84,6 +85,8 @@ main.o: ../main.c \
  /Users/rylum/ti/mspm0_sdk_2_10_00_04/source/ti/driverlib/dl_wwdt.h \
  /Users/rylum/ti/mspm0_sdk_2_10_00_04/source/ti/driverlib/m0p/dl_interrupt.h \
  /Users/rylum/ti/mspm0_sdk_2_10_00_04/source/ti/driverlib/m0p/dl_systick.h
+../user_driver/mpu6050.h:
+../user_driver/delay.h:
 ti_msp_dl_config.h:
 /Users/rylum/ti/mspm0_sdk_2_10_00_04/source/ti/devices/msp/msp.h:
 /Users/rylum/ti/mspm0_sdk_2_10_00_04/source/ti/devices/DeviceFamily.h:

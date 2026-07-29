@@ -2,15 +2,13 @@
 # Automatically-generated file. Do not edit!
 ################################################################################
 
-SHELL = cmd.exe
-
 # Add inputs and outputs from these tool invocations to the build variables 
 SYSCFG_SRCS += \
 ../empty.syscfg 
 
 C_SRCS += \
 ./ti_msp_dl_config.c \
-D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/devices/msp/m0p/startup_system_files/ticlang/startup_mspm0g350x_ticlang.c \
+/Users/rylum/ti/mspm0_sdk_2_10_00_04/source/ti/devices/msp/m0p/startup_system_files/ticlang/startup_mspm0g350x_ticlang.c \
 ../main.c 
 
 GEN_CMDS += \
@@ -64,7 +62,7 @@ SYSCFG_SRCS__QUOTED += \
 
 C_SRCS__QUOTED += \
 "./ti_msp_dl_config.c" \
-"D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source/ti/devices/msp/m0p/startup_system_files/ticlang/startup_mspm0g350x_ticlang.c" \
+"/Users/rylum/ti/mspm0_sdk_2_10_00_04/source/ti/devices/msp/m0p/startup_system_files/ticlang/startup_mspm0g350x_ticlang.c" \
 "../main.c" 
 
 

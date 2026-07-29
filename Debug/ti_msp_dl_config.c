@@ -41,7 +41,8 @@
 #include "ti_msp_dl_config.h"
 
 DL_TimerG_backupConfig gSERVOBackup;
-DL_TimerA_backupConfig gMOTOR_PIDBackup;
+DL_TimerA_backupConfig gCONTROL_LOOPBackup;
+DL_UART_Main_backupConfig gK230_LINKBackup;
 
 /*
  *  ======== SYSCFG_DL_init ========
@@ -55,15 +56,14 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_SYSCTL_init();
     SYSCFG_DL_SERVO_init();
     SYSCFG_DL_PWMAB_init();
-    SYSCFG_DL_MOTOR_PID_init();
-    SYSCFG_DL_MPU6050_init();
+    SYSCFG_DL_CONTROL_LOOP_init();
+    SYSCFG_DL_EXPANSION_I2C_init();
     SYSCFG_DL_DEBUG_init();
-    SYSCFG_DL_xuanniu_init();
-    SYSCFG_DL_VREF_init();
+    SYSCFG_DL_K230_LINK_init();
     /* Ensure backup structures have no valid state */
 	gSERVOBackup.backupRdy 	= false;
-	gMOTOR_PIDBackup.backupRdy 	= false;
-
+	gCONTROL_LOOPBackup.backupRdy 	= false;
+	gK230_LINKBackup.backupRdy 	= false;
 
 }
 /*
@@ -75,7 +75,8 @@ SYSCONFIG_WEAK bool SYSCFG_DL_saveConfiguration(void)
     bool retStatus = true;
 
 	retStatus &= DL_TimerG_saveConfiguration(SERVO_INST, &gSERVOBackup);
-	retStatus &= DL_TimerA_saveConfiguration(MOTOR_PID_INST, &gMOTOR_PIDBackup);
+	retStatus &= DL_TimerA_saveConfiguration(CONTROL_LOOP_INST, &gCONTROL_LOOPBackup);
+	retStatus &= DL_UART_Main_saveConfiguration(K230_LINK_INST, &gK230_LINKBackup);
 
     return retStatus;
 }
@@ -86,7 +87,8 @@ SYSCONFIG_WEAK bool SYSCFG_DL_restoreConfiguration(void)
     bool retStatus = true;
 
 	retStatus &= DL_TimerG_restoreConfiguration(SERVO_INST, &gSERVOBackup, false);
-	retStatus &= DL_TimerA_restoreConfiguration(MOTOR_PID_INST, &gMOTOR_PIDBackup, false);
+	retStatus &= DL_TimerA_restoreConfiguration(CONTROL_LOOP_INST, &gCONTROL_LOOPBackup, false);
+	retStatus &= DL_UART_Main_restoreConfiguration(K230_LINK_INST, &gK230_LINKBackup);
 
     return retStatus;
 }
@@ -97,21 +99,19 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_GPIO_reset(GPIOB);
     DL_TimerG_reset(SERVO_INST);
     DL_TimerG_reset(PWMAB_INST);
-    DL_TimerA_reset(MOTOR_PID_INST);
-    DL_I2C_reset(MPU6050_INST);
+    DL_TimerA_reset(CONTROL_LOOP_INST);
+    DL_I2C_reset(EXPANSION_I2C_INST);
     DL_UART_Main_reset(DEBUG_INST);
-    DL_ADC12_reset(xuanniu_INST);
-    DL_VREF_reset(VREF);
+    DL_UART_Main_reset(K230_LINK_INST);
 
     DL_GPIO_enablePower(GPIOA);
     DL_GPIO_enablePower(GPIOB);
     DL_TimerG_enablePower(SERVO_INST);
     DL_TimerG_enablePower(PWMAB_INST);
-    DL_TimerA_enablePower(MOTOR_PID_INST);
-    DL_I2C_enablePower(MPU6050_INST);
+    DL_TimerA_enablePower(CONTROL_LOOP_INST);
+    DL_I2C_enablePower(EXPANSION_I2C_INST);
     DL_UART_Main_enablePower(DEBUG_INST);
-    DL_ADC12_enablePower(xuanniu_INST);
-    DL_VREF_enablePower(VREF);
+    DL_UART_Main_enablePower(K230_LINK_INST);
     delay_cycles(POWER_STARTUP_DELAY);
 }
 
@@ -128,21 +128,25 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_initPeripheralOutputFunction(GPIO_PWMAB_C1_IOMUX,GPIO_PWMAB_C1_IOMUX_FUNC);
     DL_GPIO_enableOutput(GPIO_PWMAB_C1_PORT, GPIO_PWMAB_C1_PIN);
 
-    DL_GPIO_initPeripheralInputFunctionFeatures(GPIO_MPU6050_IOMUX_SDA,
-        GPIO_MPU6050_IOMUX_SDA_FUNC, DL_GPIO_INVERSION_DISABLE,
+    DL_GPIO_initPeripheralInputFunctionFeatures(GPIO_EXPANSION_I2C_IOMUX_SDA,
+        GPIO_EXPANSION_I2C_IOMUX_SDA_FUNC, DL_GPIO_INVERSION_DISABLE,
         DL_GPIO_RESISTOR_NONE, DL_GPIO_HYSTERESIS_DISABLE,
         DL_GPIO_WAKEUP_DISABLE);
-    DL_GPIO_initPeripheralInputFunctionFeatures(GPIO_MPU6050_IOMUX_SCL,
-        GPIO_MPU6050_IOMUX_SCL_FUNC, DL_GPIO_INVERSION_DISABLE,
+    DL_GPIO_initPeripheralInputFunctionFeatures(GPIO_EXPANSION_I2C_IOMUX_SCL,
+        GPIO_EXPANSION_I2C_IOMUX_SCL_FUNC, DL_GPIO_INVERSION_DISABLE,
         DL_GPIO_RESISTOR_NONE, DL_GPIO_HYSTERESIS_DISABLE,
         DL_GPIO_WAKEUP_DISABLE);
-    DL_GPIO_enableHiZ(GPIO_MPU6050_IOMUX_SDA);
-    DL_GPIO_enableHiZ(GPIO_MPU6050_IOMUX_SCL);
+    DL_GPIO_enableHiZ(GPIO_EXPANSION_I2C_IOMUX_SDA);
+    DL_GPIO_enableHiZ(GPIO_EXPANSION_I2C_IOMUX_SCL);
 
     DL_GPIO_initPeripheralOutputFunction(
         GPIO_DEBUG_IOMUX_TX, GPIO_DEBUG_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(
         GPIO_DEBUG_IOMUX_RX, GPIO_DEBUG_IOMUX_RX_FUNC);
+    DL_GPIO_initPeripheralOutputFunction(
+        GPIO_K230_LINK_IOMUX_TX, GPIO_K230_LINK_IOMUX_TX_FUNC);
+    DL_GPIO_initPeripheralInputFunction(
+        GPIO_K230_LINK_IOMUX_RX, GPIO_K230_LINK_IOMUX_RX_FUNC);
 
     DL_GPIO_initDigitalOutput(LED_LED0_IOMUX);
 
@@ -203,6 +207,10 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
 
     DL_GPIO_initDigitalInputFeatures(XUNJI_R4_IOMUX,
+		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
+		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
+
+    DL_GPIO_initDigitalInputFeatures(START_KEY_KEY_IOMUX,
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
 		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
 
@@ -444,7 +452,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_PWMAB_init(void) {
  * timerClkFreq = (timerClkSrc / (timerClkDivRatio * (timerClkPrescale + 1)))
  *   800000 Hz = 80000000 Hz / (1 * (99 + 1))
  */
-static const DL_TimerA_ClockConfig gMOTOR_PIDClockConfig = {
+static const DL_TimerA_ClockConfig gCONTROL_LOOPClockConfig = {
     .clockSel    = DL_TIMER_CLOCK_BUSCLK,
     .divideRatio = DL_TIMER_CLOCK_DIVIDE_1,
     .prescale    = 99U,
@@ -452,23 +460,23 @@ static const DL_TimerA_ClockConfig gMOTOR_PIDClockConfig = {
 
 /*
  * Timer load value (where the counter starts from) is calculated as (timerPeriod * timerClockFreq) - 1
- * MOTOR_PID_INST_LOAD_VALUE = (10ms * 800000 Hz) - 1
+ * CONTROL_LOOP_INST_LOAD_VALUE = (5ms * 800000 Hz) - 1
  */
-static const DL_TimerA_TimerConfig gMOTOR_PIDTimerConfig = {
-    .period     = MOTOR_PID_INST_LOAD_VALUE,
+static const DL_TimerA_TimerConfig gCONTROL_LOOPTimerConfig = {
+    .period     = CONTROL_LOOP_INST_LOAD_VALUE,
     .timerMode  = DL_TIMER_TIMER_MODE_PERIODIC_UP,
     .startTimer = DL_TIMER_STOP,
 };
 
-SYSCONFIG_WEAK void SYSCFG_DL_MOTOR_PID_init(void) {
+SYSCONFIG_WEAK void SYSCFG_DL_CONTROL_LOOP_init(void) {
 
-    DL_TimerA_setClockConfig(MOTOR_PID_INST,
-        (DL_TimerA_ClockConfig *) &gMOTOR_PIDClockConfig);
+    DL_TimerA_setClockConfig(CONTROL_LOOP_INST,
+        (DL_TimerA_ClockConfig *) &gCONTROL_LOOPClockConfig);
 
-    DL_TimerA_initTimerMode(MOTOR_PID_INST,
-        (DL_TimerA_TimerConfig *) &gMOTOR_PIDTimerConfig);
-    DL_TimerA_enableInterrupt(MOTOR_PID_INST , DL_TIMERA_INTERRUPT_LOAD_EVENT);
-    DL_TimerA_enableClock(MOTOR_PID_INST);
+    DL_TimerA_initTimerMode(CONTROL_LOOP_INST,
+        (DL_TimerA_TimerConfig *) &gCONTROL_LOOPTimerConfig);
+    DL_TimerA_enableInterrupt(CONTROL_LOOP_INST , DL_TIMERA_INTERRUPT_LOAD_EVENT);
+    DL_TimerA_enableClock(CONTROL_LOOP_INST);
 
 
 
@@ -477,20 +485,30 @@ SYSCONFIG_WEAK void SYSCFG_DL_MOTOR_PID_init(void) {
 }
 
 
-static const DL_I2C_ClockConfig gMPU6050ClockConfig = {
+static const DL_I2C_ClockConfig gEXPANSION_I2CClockConfig = {
     .clockSel = DL_I2C_CLOCK_BUSCLK,
     .divideRatio = DL_I2C_CLOCK_DIVIDE_1,
 };
 
-SYSCONFIG_WEAK void SYSCFG_DL_MPU6050_init(void) {
+SYSCONFIG_WEAK void SYSCFG_DL_EXPANSION_I2C_init(void) {
 
-    DL_I2C_setClockConfig(MPU6050_INST,
-        (DL_I2C_ClockConfig *) &gMPU6050ClockConfig);
-    DL_I2C_setAnalogGlitchFilterPulseWidth(MPU6050_INST,
+    DL_I2C_setClockConfig(EXPANSION_I2C_INST,
+        (DL_I2C_ClockConfig *) &gEXPANSION_I2CClockConfig);
+    DL_I2C_setAnalogGlitchFilterPulseWidth(EXPANSION_I2C_INST,
         DL_I2C_ANALOG_GLITCH_FILTER_WIDTH_50NS);
-    DL_I2C_enableAnalogGlitchFilter(MPU6050_INST);
+    DL_I2C_enableAnalogGlitchFilter(EXPANSION_I2C_INST);
+
+    /* Configure Controller Mode */
+    DL_I2C_resetControllerTransfer(EXPANSION_I2C_INST);
+    /* Set frequency to 400000 Hz*/
+    DL_I2C_setTimerPeriod(EXPANSION_I2C_INST, 9);
+    DL_I2C_setControllerTXFIFOThreshold(EXPANSION_I2C_INST, DL_I2C_TX_FIFO_LEVEL_EMPTY);
+    DL_I2C_setControllerRXFIFOThreshold(EXPANSION_I2C_INST, DL_I2C_RX_FIFO_LEVEL_BYTES_1);
+    DL_I2C_enableControllerClockStretching(EXPANSION_I2C_INST);
 
 
+    /* Enable module */
+    DL_I2C_enableController(EXPANSION_I2C_INST);
 
 
 }
@@ -530,43 +548,35 @@ SYSCONFIG_WEAK void SYSCFG_DL_DEBUG_init(void)
 
     DL_UART_Main_enable(DEBUG_INST);
 }
-
-/* xuanniu Initialization */
-static const DL_ADC12_ClockConfig gxuanniuClockConfig = {
-    .clockSel       = DL_ADC12_CLOCK_SYSOSC,
-    .divideRatio    = DL_ADC12_CLOCK_DIVIDE_1,
-    .freqRange      = DL_ADC12_CLOCK_FREQ_RANGE_24_TO_32,
+static const DL_UART_Main_ClockConfig gK230_LINKClockConfig = {
+    .clockSel    = DL_UART_MAIN_CLOCK_BUSCLK,
+    .divideRatio = DL_UART_MAIN_CLOCK_DIVIDE_RATIO_1
 };
-SYSCONFIG_WEAK void SYSCFG_DL_xuanniu_init(void)
+
+static const DL_UART_Main_Config gK230_LINKConfig = {
+    .mode        = DL_UART_MAIN_MODE_NORMAL,
+    .direction   = DL_UART_MAIN_DIRECTION_TX_RX,
+    .flowControl = DL_UART_MAIN_FLOW_CONTROL_NONE,
+    .parity      = DL_UART_MAIN_PARITY_NONE,
+    .wordLength  = DL_UART_MAIN_WORD_LENGTH_8_BITS,
+    .stopBits    = DL_UART_MAIN_STOP_BITS_ONE
+};
+
+SYSCONFIG_WEAK void SYSCFG_DL_K230_LINK_init(void)
 {
-    DL_ADC12_setClockConfig(xuanniu_INST, (DL_ADC12_ClockConfig *) &gxuanniuClockConfig);
-    DL_ADC12_initSingleSample(xuanniu_INST,
-        DL_ADC12_REPEAT_MODE_ENABLED, DL_ADC12_SAMPLING_SOURCE_AUTO, DL_ADC12_TRIG_SRC_SOFTWARE,
-        DL_ADC12_SAMP_CONV_RES_12_BIT, DL_ADC12_SAMP_CONV_DATA_FORMAT_UNSIGNED);
-    DL_ADC12_configConversionMem(xuanniu_INST, xuanniu_ADCMEM_0,
-        DL_ADC12_INPUT_CHAN_1, DL_ADC12_REFERENCE_VOLTAGE_INTREF, DL_ADC12_SAMPLE_TIMER_SOURCE_SCOMP0, DL_ADC12_AVERAGING_MODE_DISABLED,
-        DL_ADC12_BURN_OUT_SOURCE_DISABLED, DL_ADC12_TRIGGER_MODE_AUTO_NEXT, DL_ADC12_WINDOWS_COMP_MODE_DISABLED);
-    DL_ADC12_enableConversions(xuanniu_INST);
+    DL_UART_Main_setClockConfig(K230_LINK_INST, (DL_UART_Main_ClockConfig *) &gK230_LINKClockConfig);
+
+    DL_UART_Main_init(K230_LINK_INST, (DL_UART_Main_Config *) &gK230_LINKConfig);
+    /*
+     * Configure baud rate by setting oversampling and baud rate divisors.
+     *  Target baud rate: 9600
+     *  Actual baud rate: 9600.1
+     */
+    DL_UART_Main_setOversampling(K230_LINK_INST, DL_UART_OVERSAMPLING_RATE_16X);
+    DL_UART_Main_setBaudRateDivisor(K230_LINK_INST, K230_LINK_IBRD_80_MHZ_9600_BAUD, K230_LINK_FBRD_80_MHZ_9600_BAUD);
+
+
+
+    DL_UART_Main_enable(K230_LINK_INST);
 }
-
-
-static const DL_VREF_ClockConfig gVREFClockConfig = {
-    .clockSel = DL_VREF_CLOCK_LFCLK,
-    .divideRatio = DL_VREF_CLOCK_DIVIDE_1,
-};
-static const DL_VREF_Config gVREFConfig = {
-    .vrefEnable     = DL_VREF_ENABLE_ENABLE,
-    .bufConfig      = DL_VREF_BUFCONFIG_OUTPUT_2_5V,
-    .shModeEnable   = DL_VREF_SHMODE_DISABLE,
-    .holdCycleCount = DL_VREF_HOLD_MIN,
-    .shCycleCount   = DL_VREF_SH_MIN,
-};
-
-SYSCONFIG_WEAK void SYSCFG_DL_VREF_init(void) {
-    DL_VREF_setClockConfig(VREF,
-        (DL_VREF_ClockConfig *) &gVREFClockConfig);
-    DL_VREF_configReference(VREF,
-        (DL_VREF_Config *) &gVREFConfig);
-}
-
 

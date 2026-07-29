@@ -9,7 +9,7 @@ TIARMCLANG_INCLUDE ?= /Applications/ti/ccs2100/ccs/tools/compiler/ti-cgt-armllvm
 # 验证产物写入临时目录，避免改动 CCS 自动生成的 Debug 构建文件。
 PROJECT_ROOT := $(CURDIR)
 SYSCONFIG_FILE := $(PROJECT_ROOT)/empty.syscfg
-CHECK_ROOT ?= /tmp/11_PID_car_check
+CHECK_ROOT ?= /tmp/12_Encoder_Line_Car_check
 SYSCONFIG_OUT := $(CHECK_ROOT)/syscfg
 OBJECT_OUT := $(CHECK_ROOT)/objects
 

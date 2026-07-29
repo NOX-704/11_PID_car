@@ -2,9 +2,7 @@
 # Automatically-generated file. Do not edit!
 ################################################################################
 
-SHELL = cmd.exe
-
-CG_TOOL_ROOT := D:/ti/ccs2050/ccs/tools/compiler/ti-cgt-armllvm_4.0.4.LTS
+CG_TOOL_ROOT := /Users/rylum/ti/ti_cgt_arm_llvm_4.0.2.LTS
 
 GEN_OPTS__FLAG := @"./device.opt" 
 GEN_CMDS__FLAG := -Wl,-l"./device_linker.cmd" 
@@ -13,11 +11,10 @@ ORDERED_OBJS += \
 "./ti_msp_dl_config.o" \
 "./startup_mspm0g350x_ticlang.o" \
 "./main.o" \
-"./user_driver/MPU6050.o" \
 "./user_driver/delay.o" \
-"./user_driver/huidu.o" \
 "./user_driver/key.o" \
 "./user_driver/motor.o" \
+"./user_driver/mpu6050.o" \
 "./user_driver/uart.o" \
 $(GEN_CMDS__FLAG) \
 -Wl,-ldevice.cmd.genlibs \
@@ -25,8 +22,8 @@ $(GEN_CMDS__FLAG) \
 
 -include ../makefile.init
 
-RM := DEL /F
-RMDIR := RMDIR /S/Q
+RM := rm -rf
+RMDIR := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
@@ -124,28 +121,28 @@ endif
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXE_OUTPUTS += \
-11_PID_car.out 
+12_Encoder_Line_Car.out 
 
 EXE_OUTPUTS__QUOTED += \
-"11_PID_car.out" 
+"12_Encoder_Line_Car.out" 
 
 
 # All Target
 all: $(OBJS) $(GEN_CMDS)
-	@$(MAKE) --no-print-directory -Onone "11_PID_car.out"
+	@$(MAKE) --no-print-directory -Onone "12_Encoder_Line_Car.out"
 
 # Tool invocations
-11_PID_car.out: $(OBJS) $(GEN_CMDS)
+12_Encoder_Line_Car.out: $(OBJS) $(GEN_CMDS)
 	@echo 'Arm Linker - building target: "$@"'
-	"D:/ti/ccs2050/ccs/tools/compiler/ti-cgt-armllvm_4.0.4.LTS/bin/tiarmclang.exe" @"device.opt"  -march=thumbv6m -mcpu=cortex-m0plus -mfloat-abi=soft -mlittle-endian -mthumb -O0 -gdwarf-3 -Wall -Wl,-m"11_PID_car.map" -Wl,-i"D:/ti/ccs2050/mspm0_sdk_2_10_00_04/source" -Wl,-i"C:/Users/80706/workspace_ccstheia/11_PID_car" -Wl,-i"C:/Users/80706/workspace_ccstheia/11_PID_car/Debug/syscfg" -Wl,-i"D:/ti/ccs2050/ccs/tools/compiler/ti-cgt-armllvm_4.0.4.LTS/lib" -Wl,--diag_wrap=off -Wl,--display_error_number -Wl,--warn_sections -Wl,--xml_link_info="11_PID_car_linkInfo.xml" -Wl,--rom_model -o "11_PID_car.out" $(ORDERED_OBJS)
+	"/Users/rylum/ti/ti_cgt_arm_llvm_4.0.2.LTS/bin/tiarmclang" @"device.opt"  -march=thumbv6m -mcpu=cortex-m0plus -mfloat-abi=soft -mlittle-endian -mthumb -O0 -gdwarf-3 -Wall -Wl,-m"12_Encoder_Line_Car.map" -Wl,-i"/Users/rylum/ti/mspm0_sdk_2_10_00_04/source" -Wl,-i"/Users/rylum/workspace_ccstheia/12_Encoder_Line_Car" -Wl,-i"/Users/rylum/workspace_ccstheia/12_Encoder_Line_Car/Debug/syscfg" -Wl,-i"/Users/rylum/ti/ti_cgt_arm_llvm_4.0.2.LTS/lib" -Wl,--diag_wrap=off -Wl,--display_error_number -Wl,--warn_sections -Wl,--xml_link_info="12_Encoder_Line_Car_linkInfo.xml" -Wl,--rom_model -o "12_Encoder_Line_Car.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: "$@"'
 	@echo ' '
 
 # Other Targets
 clean:
 	-$(RM) $(GEN_MISC_FILES__QUOTED)$(GEN_FILES__QUOTED)$(EXE_OUTPUTS__QUOTED)
-	-$(RM) "ti_msp_dl_config.o" "startup_mspm0g350x_ticlang.o" "main.o" "user_driver\MPU6050.o" "user_driver\delay.o" "user_driver\huidu.o" "user_driver\key.o" "user_driver\motor.o" "user_driver\uart.o" 
-	-$(RM) "ti_msp_dl_config.d" "startup_mspm0g350x_ticlang.d" "main.d" "user_driver\MPU6050.d" "user_driver\delay.d" "user_driver\huidu.d" "user_driver\key.d" "user_driver\motor.d" "user_driver\uart.d" 
+	-$(RM) "ti_msp_dl_config.o" "startup_mspm0g350x_ticlang.o" "main.o" "user_driver/delay.o" "user_driver/key.o" "user_driver/motor.o" "user_driver/mpu6050.o" "user_driver/uart.o" 
+	-$(RM) "ti_msp_dl_config.d" "startup_mspm0g350x_ticlang.d" "main.d" "user_driver/delay.d" "user_driver/key.d" "user_driver/motor.d" "user_driver/mpu6050.d" "user_driver/uart.d" 
 	-@echo ' '
 
 .PHONY: all clean dependents

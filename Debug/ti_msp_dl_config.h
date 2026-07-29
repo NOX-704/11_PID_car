@@ -121,27 +121,28 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 
 
 
-/* Defines for MOTOR_PID */
-#define MOTOR_PID_INST                                                   (TIMA0)
-#define MOTOR_PID_INST_IRQHandler                               TIMA0_IRQHandler
-#define MOTOR_PID_INST_INT_IRQN                                 (TIMA0_INT_IRQn)
-#define MOTOR_PID_INST_LOAD_VALUE                                        (7999U)
+/* Defines for CONTROL_LOOP */
+#define CONTROL_LOOP_INST                                                (TIMA0)
+#define CONTROL_LOOP_INST_IRQHandler                            TIMA0_IRQHandler
+#define CONTROL_LOOP_INST_INT_IRQN                              (TIMA0_INT_IRQn)
+#define CONTROL_LOOP_INST_LOAD_VALUE                                     (3999U)
 
 
 
 
-/* Defines for MPU6050 */
-#define MPU6050_INST                                                        I2C0
-#define MPU6050_INST_IRQHandler                                  I2C0_IRQHandler
-#define MPU6050_INST_INT_IRQN                                      I2C0_INT_IRQn
-#define GPIO_MPU6050_SDA_PORT                                              GPIOA
-#define GPIO_MPU6050_SDA_PIN                                       DL_GPIO_PIN_0
-#define GPIO_MPU6050_IOMUX_SDA                                    (IOMUX_PINCM1)
-#define GPIO_MPU6050_IOMUX_SDA_FUNC                     IOMUX_PINCM1_PF_I2C0_SDA
-#define GPIO_MPU6050_SCL_PORT                                              GPIOA
-#define GPIO_MPU6050_SCL_PIN                                       DL_GPIO_PIN_1
-#define GPIO_MPU6050_IOMUX_SCL                                    (IOMUX_PINCM2)
-#define GPIO_MPU6050_IOMUX_SCL_FUNC                     IOMUX_PINCM2_PF_I2C0_SCL
+/* Defines for EXPANSION_I2C */
+#define EXPANSION_I2C_INST                                                  I2C1
+#define EXPANSION_I2C_INST_IRQHandler                            I2C1_IRQHandler
+#define EXPANSION_I2C_INST_INT_IRQN                                I2C1_INT_IRQn
+#define EXPANSION_I2C_BUS_SPEED_HZ                                        400000
+#define GPIO_EXPANSION_I2C_SDA_PORT                                        GPIOB
+#define GPIO_EXPANSION_I2C_SDA_PIN                                 DL_GPIO_PIN_3
+#define GPIO_EXPANSION_I2C_IOMUX_SDA                             (IOMUX_PINCM16)
+#define GPIO_EXPANSION_I2C_IOMUX_SDA_FUNC               IOMUX_PINCM16_PF_I2C1_SDA
+#define GPIO_EXPANSION_I2C_SCL_PORT                                        GPIOB
+#define GPIO_EXPANSION_I2C_SCL_PIN                                 DL_GPIO_PIN_2
+#define GPIO_EXPANSION_I2C_IOMUX_SCL                             (IOMUX_PINCM15)
+#define GPIO_EXPANSION_I2C_IOMUX_SCL_FUNC               IOMUX_PINCM15_PF_I2C1_SCL
 
 
 /* Defines for DEBUG */
@@ -151,35 +152,32 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define DEBUG_INST_INT_IRQN                                       UART0_INT_IRQn
 #define GPIO_DEBUG_RX_PORT                                                 GPIOA
 #define GPIO_DEBUG_TX_PORT                                                 GPIOA
-#define GPIO_DEBUG_RX_PIN                                         DL_GPIO_PIN_11
-#define GPIO_DEBUG_TX_PIN                                         DL_GPIO_PIN_10
-#define GPIO_DEBUG_IOMUX_RX                                      (IOMUX_PINCM22)
-#define GPIO_DEBUG_IOMUX_TX                                      (IOMUX_PINCM21)
-#define GPIO_DEBUG_IOMUX_RX_FUNC                       IOMUX_PINCM22_PF_UART0_RX
-#define GPIO_DEBUG_IOMUX_TX_FUNC                       IOMUX_PINCM21_PF_UART0_TX
+#define GPIO_DEBUG_RX_PIN                                         DL_GPIO_PIN_31
+#define GPIO_DEBUG_TX_PIN                                         DL_GPIO_PIN_28
+#define GPIO_DEBUG_IOMUX_RX                                       (IOMUX_PINCM6)
+#define GPIO_DEBUG_IOMUX_TX                                       (IOMUX_PINCM3)
+#define GPIO_DEBUG_IOMUX_RX_FUNC                        IOMUX_PINCM6_PF_UART0_RX
+#define GPIO_DEBUG_IOMUX_TX_FUNC                        IOMUX_PINCM3_PF_UART0_TX
 #define DEBUG_BAUD_RATE                                                 (115200)
 #define DEBUG_IBRD_40_MHZ_115200_BAUD                                       (21)
 #define DEBUG_FBRD_40_MHZ_115200_BAUD                                       (45)
+/* Defines for K230_LINK */
+#define K230_LINK_INST                                                     UART3
+#define K230_LINK_INST_FREQUENCY                                        80000000
+#define K230_LINK_INST_IRQHandler                               UART3_IRQHandler
+#define K230_LINK_INST_INT_IRQN                                   UART3_INT_IRQn
+#define GPIO_K230_LINK_RX_PORT                                             GPIOA
+#define GPIO_K230_LINK_TX_PORT                                             GPIOA
+#define GPIO_K230_LINK_RX_PIN                                     DL_GPIO_PIN_25
+#define GPIO_K230_LINK_TX_PIN                                     DL_GPIO_PIN_26
+#define GPIO_K230_LINK_IOMUX_RX                                  (IOMUX_PINCM55)
+#define GPIO_K230_LINK_IOMUX_TX                                  (IOMUX_PINCM59)
+#define GPIO_K230_LINK_IOMUX_RX_FUNC                   IOMUX_PINCM55_PF_UART3_RX
+#define GPIO_K230_LINK_IOMUX_TX_FUNC                   IOMUX_PINCM59_PF_UART3_TX
+#define K230_LINK_BAUD_RATE                                               (9600)
+#define K230_LINK_IBRD_80_MHZ_9600_BAUD                                    (520)
+#define K230_LINK_FBRD_80_MHZ_9600_BAUD                                     (53)
 
-
-
-
-
-/* Defines for xuanniu */
-#define xuanniu_INST                                                        ADC1
-#define xuanniu_INST_IRQHandler                                  ADC1_IRQHandler
-#define xuanniu_INST_INT_IRQN                                    (ADC1_INT_IRQn)
-#define xuanniu_ADCMEM_0                                      DL_ADC12_MEM_IDX_0
-#define xuanniu_ADCMEM_0_REF                   DL_ADC12_REFERENCE_VOLTAGE_INTREF
-#define xuanniu_ADCMEM_0_REF_VOLTAGE_V                                      2.50
-#define GPIO_xuanniu_C1_PORT                                               GPIOA
-#define GPIO_xuanniu_C1_PIN                                       DL_GPIO_PIN_16
-#define GPIO_xuanniu_IOMUX_C1                                    (IOMUX_PINCM38)
-#define GPIO_xuanniu_IOMUX_C1_FUNC                (IOMUX_PINCM38_PF_UNCONNECTED)
-
-
-/* Defines for VREF */
-#define VREF_VOLTAGE_MV                                                     2500
 
 
 
@@ -234,22 +232,22 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define DC_MOTOR_BB_PORT                                                 (GPIOB)
 #define DC_MOTOR_BB_PIN                                         (DL_GPIO_PIN_20)
 #define DC_MOTOR_BB_IOMUX                                        (IOMUX_PINCM48)
-/* Defines for L1: GPIOB.6 with pinCMx 23 on package pin 58 */
-#define XUNJI_L1_PORT                                                    (GPIOB)
-#define XUNJI_L1_PIN                                             (DL_GPIO_PIN_6)
-#define XUNJI_L1_IOMUX                                           (IOMUX_PINCM23)
-/* Defines for L2: GPIOB.7 with pinCMx 24 on package pin 59 */
-#define XUNJI_L2_PORT                                                    (GPIOB)
-#define XUNJI_L2_PIN                                             (DL_GPIO_PIN_7)
-#define XUNJI_L2_IOMUX                                           (IOMUX_PINCM24)
-/* Defines for L3: GPIOA.17 with pinCMx 39 on package pin 10 */
-#define XUNJI_L3_PORT                                                    (GPIOA)
-#define XUNJI_L3_PIN                                            (DL_GPIO_PIN_17)
-#define XUNJI_L3_IOMUX                                           (IOMUX_PINCM39)
-/* Defines for L4: GPIOA.18 with pinCMx 40 on package pin 11 */
+/* Defines for L1: GPIOA.18 with pinCMx 40 on package pin 11 */
+#define XUNJI_L1_PORT                                                    (GPIOA)
+#define XUNJI_L1_PIN                                            (DL_GPIO_PIN_18)
+#define XUNJI_L1_IOMUX                                           (IOMUX_PINCM40)
+/* Defines for L2: GPIOA.16 with pinCMx 38 on package pin 9 */
+#define XUNJI_L2_PORT                                                    (GPIOA)
+#define XUNJI_L2_PIN                                            (DL_GPIO_PIN_16)
+#define XUNJI_L2_IOMUX                                           (IOMUX_PINCM38)
+/* Defines for L3: GPIOB.7 with pinCMx 24 on package pin 59 */
+#define XUNJI_L3_PORT                                                    (GPIOB)
+#define XUNJI_L3_PIN                                             (DL_GPIO_PIN_7)
+#define XUNJI_L3_IOMUX                                           (IOMUX_PINCM24)
+/* Defines for L4: GPIOA.17 with pinCMx 39 on package pin 10 */
 #define XUNJI_L4_PORT                                                    (GPIOA)
-#define XUNJI_L4_PIN                                            (DL_GPIO_PIN_18)
-#define XUNJI_L4_IOMUX                                           (IOMUX_PINCM40)
+#define XUNJI_L4_PIN                                            (DL_GPIO_PIN_17)
+#define XUNJI_L4_IOMUX                                           (IOMUX_PINCM39)
 /* Defines for R1: GPIOA.21 with pinCMx 46 on package pin 17 */
 #define XUNJI_R1_PORT                                                    (GPIOA)
 #define XUNJI_R1_PIN                                            (DL_GPIO_PIN_21)
@@ -262,10 +260,16 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define XUNJI_R3_PORT                                                    (GPIOA)
 #define XUNJI_R3_PIN                                            (DL_GPIO_PIN_24)
 #define XUNJI_R3_IOMUX                                           (IOMUX_PINCM54)
-/* Defines for R4: GPIOA.25 with pinCMx 55 on package pin 26 */
+/* Defines for R4: GPIOA.2 with pinCMx 7 on package pin 42 */
 #define XUNJI_R4_PORT                                                    (GPIOA)
-#define XUNJI_R4_PIN                                            (DL_GPIO_PIN_25)
-#define XUNJI_R4_IOMUX                                           (IOMUX_PINCM55)
+#define XUNJI_R4_PIN                                             (DL_GPIO_PIN_2)
+#define XUNJI_R4_IOMUX                                            (IOMUX_PINCM7)
+/* Port definition for Pin Group START_KEY */
+#define START_KEY_PORT                                                   (GPIOB)
+
+/* Defines for KEY: GPIOB.6 with pinCMx 23 on package pin 58 */
+#define START_KEY_KEY_PIN                                        (DL_GPIO_PIN_6)
+#define START_KEY_KEY_IOMUX                                      (IOMUX_PINCM23)
 
 
 /* clang-format on */
@@ -278,11 +282,10 @@ void SYSCFG_DL_SYSCTL_init(void);
 bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 void SYSCFG_DL_SERVO_init(void);
 void SYSCFG_DL_PWMAB_init(void);
-void SYSCFG_DL_MOTOR_PID_init(void);
-void SYSCFG_DL_MPU6050_init(void);
+void SYSCFG_DL_CONTROL_LOOP_init(void);
+void SYSCFG_DL_EXPANSION_I2C_init(void);
 void SYSCFG_DL_DEBUG_init(void);
-void SYSCFG_DL_xuanniu_init(void);
-void SYSCFG_DL_VREF_init(void);
+void SYSCFG_DL_K230_LINK_init(void);
 
 
 bool SYSCFG_DL_saveConfiguration(void);

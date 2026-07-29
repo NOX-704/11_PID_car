@@ -13,6 +13,6 @@
 	<activeTargetConfiguration value="targetConfigs/MSPM0G3507.ccxml"/>
 	<isTargetConfigurationManual value="false"/>
 	<sourceLookupPath value="${COM_TI_MSPM0_SDK_INSTALL_DIR}/source/ti/driverlib"/>
-	<origin value="C:/Users/37558/Desktop/11_PID_car"/>
+	<origin value="C:/Users/37558/Desktop/12_Encoder_Line_Car"/>
 	<filesToOpen value="README.md,empty.syscfg"/>
 </projectOptions>
