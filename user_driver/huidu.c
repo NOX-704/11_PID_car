@@ -12,10 +12,10 @@
  */
 #define TRACK_STRAIGHT_SPEED        (200.0f)
 #define TRACK_INNER_SPEED           (150.0f)
-#define TRACK_OUTER_SPEED_1         (220.0f)
-#define TRACK_OUTER_SPEED_2         (260.0f)
-#define TRACK_OUTER_SPEED_3         (360.0f)
-#define TRACK_OUTER_SPEED_4         (460.0f)
+#define TRACK_OUTER_SPEED_1         (210.0f)
+#define TRACK_OUTER_SPEED_2         (230.0f)
+#define TRACK_OUTER_SPEED_3         (280.0f)
+#define TRACK_OUTER_SPEED_4         (380.0f)
 #define TRACK_MAX_OFFSET_LEVEL      (4U)
 #define TRACK_TARGET_SPEED_MAX      (520.0f)
 
@@ -85,6 +85,11 @@ static uint8_t huidu_read_black_state(GPIO_Regs *port, uint32_t pin)
 static uint8_t huidu_select_offset_level(
     uint16_t error_magnitude, uint8_t black_count)
 {
+    if (black_count >= 2U) {
+        if (error_magnitude <= (uint16_t)(black_count + (black_count >> 1))) {
+            return 0U;
+        }
+    }
     if (error_magnitude <= (uint16_t) black_count) {
         return 1U;
     }
@@ -176,6 +181,12 @@ static void huidu_cancel_pending_gear(void)
  */
 static int8_t huidu_confirm_staircase_gear(int8_t requested_gear)
 {
+    if (requested_gear > s_applied_gear + 1) {
+        requested_gear = s_applied_gear + 1;
+    } else if (requested_gear < s_applied_gear - 1) {
+        requested_gear = s_applied_gear - 1;
+    }
+
     if (requested_gear == s_applied_gear) {
         huidu_cancel_pending_gear();
         return s_applied_gear;
@@ -295,8 +306,12 @@ static void huidu_adjust_staircase(
             ((weighted_error < 0) ? -weighted_error : weighted_error);
         offset_level = huidu_select_offset_level(
             error_magnitude, black_count);
-        requested_gear = (weighted_error < 0) ?
-            -(int8_t) offset_level : (int8_t) offset_level;
+        if (offset_level == 0U) {
+            requested_gear = 0;
+        } else {
+            requested_gear = (weighted_error < 0) ?
+                -(int8_t) offset_level : (int8_t) offset_level;
+        }
     }
 
     /*

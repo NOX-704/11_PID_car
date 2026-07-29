@@ -170,7 +170,6 @@ float heading_pid_update(
 
         if (s_curve_exit_ticks >= CURVE_EXIT_CONFIRM_TICKS) {
             s_mode = HEADING_MODE_STRAIGHT;
-            s_target_yaw_deg = current_yaw;
             s_integral = 0.0f;
             s_curve_exit_ticks = 0U;
             target_rate_dps = 0.0f;
@@ -194,6 +193,9 @@ float heading_pid_update(
         HEADING_PID_KP * heading_error +
         HEADING_PID_KI * s_integral +
         HEADING_PID_KD * (target_rate_dps - gyro_z_dps);
+    if (s_mode == HEADING_MODE_STRAIGHT) {
+        requested_correction *= 0.6f;
+    }
     requested_correction = heading_clampf(
         requested_correction,
         -HEADING_PID_OUTPUT_LIMIT,
