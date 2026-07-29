@@ -1,6 +1,8 @@
 #ifndef MOTOR_H
 #define MOTOR_H
 
+#include <stdbool.h>
+
 #define PI 3.14
 
 // 编码器线数
@@ -50,5 +52,11 @@
 void motor_init(uint8_t motor_id);
 void motor_set_duty(uint8_t motor_id, uint32_t duty);
 void motor_set_direction(uint8_t motor_id, uint8_t direction);
+
+/*
+ * 由主循环轮询。返回 true 时立即执行一次 mpu6050_update_10ms()，
+ * 从而让阻塞式 I2C 始终位于中断之外。
+ */
+bool motor_take_imu_sample_request(void);
 
 #endif // MOTOR_H

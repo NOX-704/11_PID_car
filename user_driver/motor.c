@@ -3,11 +3,22 @@
 
 /*
  * 电机 PWM 周期为 4000，控制中断周期为 10 ms。
- * 每次最多改变 30；持续请求满量程时，从 0 到 4000 约需 134 次，
- * 即约 1.34 s。较小的 PWM 变化会按相同斜率更早完成。
+ * 每次最多改变 80；持续请求满量程时，从 0 到 4000 约需 50 次，
+ * 即约 0.5 s。保留用户实车修改后的斜坡速度。
  */
 #define MOTOR_PWM_MAX_DUTY  (4000)
-#define MOTOR_PWM_RAMP_STEP (30)
+#define MOTOR_PWM_RAMP_STEP (80)
+
+/*
+ * 双轮编码器只负责让实际轮速跟随航向控制给出的左右目标。原来的
+ * 通用增量式 PID 已删除；编码器计数的离散噪声容易被 D 项放大，
+ * 因此新的底层速度环明确使用增量式 PI。
+ */
+#define MOTOR_SPEED_PI_KP   (0.5f)
+#define MOTOR_SPEED_PI_KI   (0.4f)
+
+/* 由 10 ms 中断置位，主循环取走后执行一次 MPU6050 I2C 采样。 */
+static volatile uint8_t s_imu_sample_request = 0U;
 
 void motor_init(uint8_t motor_id)
 {
@@ -25,8 +36,8 @@ void motor_init(uint8_t motor_id)
     }
     DL_Timer_startCounter(PWMAB_INST);
     DL_GPIO_setPins(DC_MOTOR_STBY_PORT, DC_MOTOR_STBY_PIN);
-    DL_Timer_startCounter(MOTOR_PID_INST);
-    NVIC_EnableIRQ(MOTOR_PID_INST_INT_IRQN);
+    DL_Timer_startCounter(CONTROL_LOOP_INST);
+    NVIC_EnableIRQ(CONTROL_LOOP_INST_INT_IRQN);
 }
 
 // 限幅函数
@@ -45,8 +56,8 @@ int limit_duty(int duty)
 /**
  * 限制一次 10 ms 控制周期内的实际 PWM 变化量。
  *
- * 循迹外环更新阶梯目标轮速差，最终写入 TB6612 的 PWM 每次仍最多
- * 变化 30，避免档位切换时速度环输出直接形成 PWM 硬阶跃。
+ * 循迹外环更新目标轮速差，最终写入 TB6612 的 PWM 每次仍最多
+ * 变化 80，避免档位切换和航向 PID 修正形成 PWM 硬阶跃。
  */
 static int motor_ramp_duty(int current_duty, int requested_duty)
 {
@@ -128,21 +139,21 @@ void calculate_speed(uint8_t motor_id)
     }
 }
 
-float kp = 0.5; // 比例系数
-float ki = 0.4; // 积分系数
-float kd = 0.1; // 微分系数
-
 int PWM_1_duty = 0;
 float target_speed_1 = 0; // 目标速度 mm/s
-float last_error_1 = 0;
-float prev_error_1 = 0;
+static float s_last_speed_error_1 = 0.0f;
 
 int PWM_2_duty = 0;
 float target_speed_2 = 0; // 目标速度 mm/s
-float last_error_2 = 0;
-float prev_error_2 = 0;
+static float s_last_speed_error_2 = 0.0f;
 
-void DC_MOTOR_PID(uint8_t motor_id)
+/**
+ * 新的双轮增量式速度 PI。
+ *
+ * MPU6050 航向 PID 产生左右目标轮速；本函数只消除两个电机和负载的
+ * 个体差异。去掉 D 项可以避免 10 ms 编码器计数跳变放大为 PWM 抖动。
+ */
+static void motor_speed_pi_update(uint8_t motor_id)
 {
     float error;
     int pid_delta;
@@ -150,44 +161,53 @@ void DC_MOTOR_PID(uint8_t motor_id)
 
     if (motor_id == 1) {
         error = target_speed_1 - speed_1;
-        pid_delta = (int)(kp * (error - last_error_1)
-                        + ki * error
-                        + kd * (error - 2 * last_error_1 + prev_error_1));
-        prev_error_1 = last_error_1;
-        last_error_1 = error;
+        pid_delta = (int)(
+            MOTOR_SPEED_PI_KP * (error - s_last_speed_error_1) +
+            MOTOR_SPEED_PI_KI * error);
+        s_last_speed_error_1 = error;
         requested_duty = limit_duty(PWM_1_duty + pid_delta);
         PWM_1_duty = motor_ramp_duty(PWM_1_duty, requested_duty);
         motor_set_duty(motor_id, PWM_1_duty);
     }
     if (motor_id == 2) {
         error = target_speed_2 - speed_2;
-        pid_delta = (int)(kp * (error - last_error_2)
-                        + ki * error
-                        + kd * (error - 2 * last_error_2 + prev_error_2));
-        prev_error_2 = last_error_2;
-        last_error_2 = error;
+        pid_delta = (int)(
+            MOTOR_SPEED_PI_KP * (error - s_last_speed_error_2) +
+            MOTOR_SPEED_PI_KI * error);
+        s_last_speed_error_2 = error;
         requested_duty = limit_duty(PWM_2_duty + pid_delta);
         PWM_2_duty = motor_ramp_duty(PWM_2_duty, requested_duty);
         motor_set_duty(motor_id, PWM_2_duty);
     }
 }
 
-void MOTOR_PID_INST_IRQHandler()
+bool motor_take_imu_sample_request(void)
 {
-    switch (DL_Timer_getPendingInterrupt(MOTOR_PID_INST))
+    if (s_imu_sample_request == 0U) {
+        return false;
+    }
+
+    s_imu_sample_request = 0U;
+    return true;
+}
+
+void CONTROL_LOOP_INST_IRQHandler(void)
+{
+    switch (DL_Timer_getPendingInterrupt(CONTROL_LOOP_INST))
     {
     case DL_TIMER_IIDX_LOAD:
+        /*
+         * 中断内只执行无阻塞计算。MPU6050 I2C 采样由主循环完成，
+         * 防止总线超时把电机控制中断卡死。
+         */
+        s_imu_sample_request = 1U;
         adjust_motor();
         calculate_speed(1);
-        DC_MOTOR_PID(1);
+        motor_speed_pi_update(1);
         calculate_speed(2);
-        DC_MOTOR_PID(2);
+        motor_speed_pi_update(2);
         break;
-    // case DL_TIMER_IIDX_COMPARE_0:
-    //     status = (status + 3 -1) % 3;
-    //     /* code */
-    //     break;
-    
+
     default:
         break;
     }
