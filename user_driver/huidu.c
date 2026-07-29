@@ -262,21 +262,20 @@ static float huidu_steering_pid_update(float raw_error)
 #endif
 
 /**
- * 镜像读取八路传感器，并按车体从左到右写入数组。
+ * 按 PCB 网络名称直接读取八路传感器，并从左到右写入数组。
  *
- * 实车确认模块安装方向与原 PCB 网络命名左右相反，因此读取层执行：
- * L1↔R4、L2↔R3、L3↔R2、L4↔R1。
+ * 左右不再额外镜像：L1~L4 对应数组前四项，R1~R4 对应后四项。
  */
 void huidu_get_value(void)
 {
-    huidu_value[0] = huidu_read_black_state(XUNJI_R4_PORT, XUNJI_R4_PIN);
-    huidu_value[1] = huidu_read_black_state(XUNJI_R3_PORT, XUNJI_R3_PIN);
-    huidu_value[2] = huidu_read_black_state(XUNJI_R2_PORT, XUNJI_R2_PIN);
-    huidu_value[3] = huidu_read_black_state(XUNJI_R1_PORT, XUNJI_R1_PIN);
-    huidu_value[4] = huidu_read_black_state(XUNJI_L4_PORT, XUNJI_L4_PIN);
-    huidu_value[5] = huidu_read_black_state(XUNJI_L3_PORT, XUNJI_L3_PIN);
-    huidu_value[6] = huidu_read_black_state(XUNJI_L2_PORT, XUNJI_L2_PIN);
-    huidu_value[7] = huidu_read_black_state(XUNJI_L1_PORT, XUNJI_L1_PIN);
+    huidu_value[0] = huidu_read_black_state(XUNJI_L1_PORT, XUNJI_L1_PIN);
+    huidu_value[1] = huidu_read_black_state(XUNJI_L2_PORT, XUNJI_L2_PIN);
+    huidu_value[2] = huidu_read_black_state(XUNJI_L3_PORT, XUNJI_L3_PIN);
+    huidu_value[3] = huidu_read_black_state(XUNJI_L4_PORT, XUNJI_L4_PIN);
+    huidu_value[4] = huidu_read_black_state(XUNJI_R1_PORT, XUNJI_R1_PIN);
+    huidu_value[5] = huidu_read_black_state(XUNJI_R2_PORT, XUNJI_R2_PIN);
+    huidu_value[6] = huidu_read_black_state(XUNJI_R3_PORT, XUNJI_R3_PIN);
+    huidu_value[7] = huidu_read_black_state(XUNJI_R4_PORT, XUNJI_R4_PIN);
 }
 
 /**

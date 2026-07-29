@@ -7,7 +7,7 @@
  * PCB 八路循迹网络的引脚：
  * L1=PA18, L2=PA16, L3=PB7, L4=PA17,
  * R1=PA21, R2=PA22, R3=PA24, R4=PA2。
- * 实车模块方向相反，huidu_get_value() 会镜像成车体从左到右顺序。
+ * huidu_get_value() 按上述 PCB 网络名称直接从左到右读取，不额外镜像。
  */
 #define HUIDU_SENSOR_COUNT (8U)
 
@@ -22,7 +22,7 @@ extern volatile uint8_t huidu_value[HUIDU_SENSOR_COUNT];
 extern volatile float huidu_line_error;
 extern volatile float huidu_steer_correction;
 
-/* 镜像读取八路 GPIO，并按车体从左到右更新黑线检测状态。 */
+/* 按 PCB 的 L1~L4、R1~R4 顺序读取 GPIO 并更新黑线检测状态。 */
 void huidu_get_value(void);
 
 /* 根据八路黑线重心执行当前选择的阶梯/PID控制并更新目标速度。 */
