@@ -63,7 +63,7 @@ static const int8_t s_black_position_weight[HUIDU_SENSOR_COUNT] = {
 };
 
 /*
- * 亚博智能八路循迹模块使用高电平表示检测到黑线：
+ * 亚博智能八路循迹模块的 GPIO 数字输出为低电平有效：
  * huidu_value[]=1 表示黑线，0 表示白色背景。
  */
 volatile uint8_t huidu_value[HUIDU_SENSOR_COUNT] = {0U};
@@ -78,9 +78,7 @@ volatile float huidu_steer_correction = 0.0f;
 extern float target_speed_1;
 extern float target_speed_2;
 
-/* 阶梯模式状态：记录上次有效指令，用于短时丢线搜索。 */
-static float s_last_command_speed_1 = TRACK_STRAIGHT_SPEED;
-static float s_last_command_speed_2 = TRACK_STRAIGHT_SPEED;
+/* 阶梯模式状态：记录上次有效偏移档位，用于最高档丢线搜索。 */
 static uint8_t s_last_offset_level = 0U;
 
 #if TRACK_USE_STEERING_PID
@@ -102,7 +100,12 @@ static uint8_t s_lost_line_ticks = 0U;
 static uint8_t huidu_read_black_state(GPIO_Regs *port, uint32_t pin)
 {
     uint32_t raw_level = DL_GPIO_readPins(port, pin) & pin;
-    return (raw_level != 0U) ? 1U : 0U;
+
+    /*
+     * 亚博官方定义：白底灭灯时 IO=1，黑线亮灯时 IO=0。
+     * 读取层统一转换成“黑=1、白=0”，避免控制层到处反相。
+     */
+    return (raw_level == 0U) ? 1U : 0U;
 }
 
 /**
@@ -151,8 +154,6 @@ static float huidu_get_outer_speed(uint8_t offset_level)
 static void huidu_set_staircase_command(
     float right_speed, float left_speed, uint8_t offset_level)
 {
-    s_last_command_speed_1 = right_speed;
-    s_last_command_speed_2 = left_speed;
     s_last_offset_level = offset_level;
     target_speed_1 = right_speed;
     target_speed_2 = left_speed;
@@ -297,13 +298,13 @@ static void huidu_adjust_staircase(
 
     /*
      * 八路全白可能是黑线位于中心间隙，也可能是严重偏移后刚越线。
-     * 若上一状态是第 4 档最高差速，则一直保持原左右轮目标，直到
+     * 若上一状态是第 4 档最高差速，则不写入新目标，原左右轮目标
+     * 会一直保持，直到
      * 任意探头重新识别到黑线；第 1~3 档和直行状态遇到全白则直行。
      */
     if (black_count == 0U) {
         if (s_last_offset_level == TRACK_MAX_OFFSET_LEVEL) {
-            target_speed_1 = s_last_command_speed_1;
-            target_speed_2 = s_last_command_speed_2;
+            return;
         } else {
             huidu_line_error = 0.0f;
             huidu_set_staircase_command(
