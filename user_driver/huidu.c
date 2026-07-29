@@ -5,25 +5,33 @@
 #include "ti_msp_dl_config.h"
 
 /*
- * ======================== 四档阶梯差速参数 ========================
+ * ======================== 连续循迹 PD 参数 ========================
  *
- * 阶梯差速继续负责根据黑线位置提供主要转弯量；MPU6050 航向 PID
- * 在此基础上只增加平滑修正，不再保留旧的纯循迹转向 PID。
+ * 用浮点重心偏移量驱动差速，输出连续值替代原来的 4 级阶梯档位。
+ * 差速 (mm/s) = KP × 重心偏移 + KD × 偏移变化率。
+ *
+ * huidu_line_error 范围约 [-4, 4]，KP=85 → 最大差速 ±340 mm/s。
  */
-#define TRACK_STRAIGHT_SPEED        (300.0f)
-#define TRACK_INNER_SPEED           (240.0f)
-#define TRACK_OUTER_SPEED_1         (310.0f)
-#define TRACK_OUTER_SPEED_2         (340.0f)
-#define TRACK_OUTER_SPEED_3         (400.0f)
-#define TRACK_OUTER_SPEED_4         (500.0f)
-#define TRACK_MAX_OFFSET_LEVEL      (4U)
-#define TRACK_TARGET_SPEED_MAX      (700.0f)
+#define TRACK_CENTER_SPEED       (300.0f)
+#define TRACK_MAX_DIFF           (340.0f)
+#define TRACK_PD_KP              (85.0f)
+#define TRACK_PD_KD              (15.0f)
+#define TRACK_LPF_ALPHA          (0.3f)
+#define TRACK_TARGET_SPEED_MAX   (640.0f)
 
 /*
- * 新档位必须连续出现 3 个 10 ms 控制周期才生效。
- * 增大可提高抗抖能力但会降低转向响应，减小则反应更快但更容易跳档。
+ * 虚拟档位阈值，用于 heading_pid_update 的入弯/出弯判断。
+ * 只对航向 PID 可见，不影响实际差速输出。
  */
-#define TRACK_GEAR_CONFIRM_TICKS    (3U)
+#define TRACK_VGEAR_DEADBAND     (25.0f)
+#define TRACK_VGEAR_LEVEL_2      (100.0f)
+#define TRACK_VGEAR_LEVEL_3      (160.0f)
+#define TRACK_VGEAR_LEVEL_4      (260.0f)
+
+/*
+ * 八路全白丢线保持：上一周期差速绝对值超过此阈值时保持原运动状态。
+ */
+#define TRACK_HOLD_THRESHOLD     (200.0f)
 
 /*
  * 权重以 L4/R1 之间的车体中心为零点。
@@ -40,8 +48,7 @@ static const int8_t s_black_position_weight[HUIDU_SENSOR_COUNT] = {
 volatile uint8_t huidu_value[HUIDU_SENSOR_COUNT] = {0U};
 
 /*
- * CCS Expressions 观察量：原始黑线重心，以及阶梯差速与 MPU6050
- * 航向 PID 叠加后的 (左轮目标-右轮目标)/2。
+ * CCS Expressions 观察量：原始黑线重心，以及输出的半差速。
  */
 volatile float huidu_line_error = 0.0f;
 volatile float huidu_steer_correction = 0.0f;
@@ -50,16 +57,14 @@ extern float target_speed_1;
 extern float target_speed_2;
 
 /*
- * 阶梯模式状态：
- * - s_applied_gear：当前实际档位，负数左偏、正数右偏、0 为直行。
- * - s_candidate_gear：等待确认的新档位。
- * - s_candidate_ticks：新档位连续出现的控制周期数。
- * - s_last_offset_level：当前实际档位绝对值，用于最高档丢线保持。
+ * 连续 PD 状态：
+ * - s_line_error_filtered：低通滤波后的重心偏移，用于 P 项和 D 项。
+ * - s_prev_line_error：上一周期的滤波值，用于 D 项（微分）。
+ * - s_prev_track_diff：上一周期 PD 输出的差速，用于全白丢线保持判断。
  */
-static int8_t s_applied_gear = 0;
-static int8_t s_candidate_gear = 0;
-static uint8_t s_candidate_ticks = 0U;
-static uint8_t s_last_offset_level = 0U;
+static float s_line_error_filtered = 0.0f;
+static float s_prev_line_error = 0.0f;
+static float s_prev_track_diff = 0.0f;
 
 /**
  * 读取亚博智能八路循迹模块的单路数字输出。
@@ -78,161 +83,136 @@ static uint8_t huidu_read_black_state(GPIO_Regs *port, uint32_t pin)
 }
 
 /**
- * 根据黑线重心的平均绝对偏移选择第 1~4 档差速。
+ * 连续循迹 PD，替代原来基于档位的阶梯差速。
  *
- * 使用整数交叉比较，避免在 10 ms 中断中进行不必要的浮点除法。
+ * 输入：传感器加权误差和黑点数。
+ * 直接输出 target_speed_1（右轮）和 target_speed_2（左轮）。
  */
-static uint8_t huidu_select_offset_level(
-    uint16_t error_magnitude, uint8_t black_count)
+static void huidu_tracking_pd(
+    int16_t weighted_error, uint8_t black_count)
 {
-    if (error_magnitude <= (uint16_t) black_count) {
-        return 1U;
-    }
-    if (error_magnitude <= (uint16_t) (2U * black_count)) {
-        return 2U;
-    }
-    if (error_magnitude <= (uint16_t) (3U * black_count)) {
-        return 3U;
-    }
-    return 4U;
-}
+    float track_diff;
+    float heading_correction;
+    float left_speed, right_speed;
+    float abs_diff;
+    int8_t virtual_gear;
 
-/** 返回指定偏移档位对应的弯道外侧轮目标速度。 */
-static float huidu_get_outer_speed(uint8_t offset_level)
-{
-    switch (offset_level) {
-    case 1U:
-        return TRACK_OUTER_SPEED_1;
-    case 2U:
-        return TRACK_OUTER_SPEED_2;
-    case 3U:
-        return TRACK_OUTER_SPEED_3;
-    default:
-        return TRACK_OUTER_SPEED_4;
-    }
-}
-
-/** 把目标轮速限制到电机速度环允许的安全范围。 */
-static float huidu_limit_target_speed(float speed)
-{
-    if (speed < 0.0f) {
-        return 0.0f;
-    }
-    if (speed > TRACK_TARGET_SPEED_MAX) {
-        return TRACK_TARGET_SPEED_MAX;
-    }
-    return speed;
-}
-
-/**
- * 保存并下发“阶梯差速 + MPU6050 航向 PID”的最终目标。
- *
- * 通道 1/A 是右轮，通道 2/B 是左轮。新的航向 PID 规定正修正表示
- * 左轮加速、右轮减速，即车辆顺时针/向右修正。
- */
-static void huidu_set_staircase_command(
-    float right_speed, float left_speed, int8_t applied_gear)
-{
-    float center_speed = (right_speed + left_speed) * 0.5f;
-    float imu_correction = heading_pid_update(
-        applied_gear, center_speed);
-    float corrected_right = huidu_limit_target_speed(
-        right_speed - imu_correction);
-    float corrected_left = huidu_limit_target_speed(
-        left_speed + imu_correction);
-    uint8_t offset_level = (uint8_t)
-        ((applied_gear < 0) ? -applied_gear : applied_gear);
-
-    s_last_offset_level = offset_level;
-    target_speed_1 = corrected_right;
-    target_speed_2 = corrected_left;
-    huidu_steer_correction =
-        (corrected_left - corrected_right) * 0.5f;
-}
-
-/**
- * 清除待确认档位，并把当前实际档位强制设置为指定值。
- *
- * 全黑停车和非最高档全白直行属于安全/确定状态，应立即生效。
- */
-static void huidu_reset_gear_debounce(int8_t applied_gear)
-{
-    s_applied_gear = applied_gear;
-    s_candidate_gear = applied_gear;
-    s_candidate_ticks = 0U;
-}
-
-/**
- * 取消尚未完成的换档确认，但保持当前实际档位不变。
- */
-static void huidu_cancel_pending_gear(void)
-{
-    s_candidate_gear = s_applied_gear;
-    s_candidate_ticks = 0U;
-}
-
-/**
- * 对请求档位执行连续样本确认，并返回当前允许下发的实际档位。
- */
-static int8_t huidu_confirm_staircase_gear(int8_t requested_gear)
-{
-    if (requested_gear > s_applied_gear + 1) {
-        requested_gear = s_applied_gear + 1;
-    } else if (requested_gear < s_applied_gear - 1) {
-        requested_gear = s_applied_gear - 1;
-    }
-
-    if (requested_gear == s_applied_gear) {
-        huidu_cancel_pending_gear();
-        return s_applied_gear;
-    }
-
-    if (s_applied_gear == 0 && requested_gear != 0) {
-        s_applied_gear = (requested_gear > 0) ? 1 : -1;
-        huidu_cancel_pending_gear();
-        return s_applied_gear;
-    }
-
-    if (requested_gear != s_candidate_gear) {
-        s_candidate_gear = requested_gear;
-        s_candidate_ticks = 1U;
-    } else if (s_candidate_ticks < TRACK_GEAR_CONFIRM_TICKS) {
-        s_candidate_ticks++;
-    }
-
-    if (s_candidate_ticks >= TRACK_GEAR_CONFIRM_TICKS) {
-        s_applied_gear = requested_gear;
-        huidu_cancel_pending_gear();
-    }
-
-    return s_applied_gear;
-}
-
-/** 把带方向的实际档位转换为左右轮基础目标速度。 */
-static void huidu_apply_staircase_gear(int8_t applied_gear)
-{
-    uint8_t offset_level;
-    float outer_speed;
-
-    if (applied_gear == 0) {
-        huidu_set_staircase_command(
-            TRACK_STRAIGHT_SPEED, TRACK_STRAIGHT_SPEED, 0);
+    /* 八路全黑无法判断黑线中心，立即停车并清除全部控制历史。 */
+    if (black_count == HUIDU_SENSOR_COUNT) {
+        huidu_line_error = 0.0f;
+        s_line_error_filtered = 0.0f;
+        s_prev_line_error = 0.0f;
+        s_prev_track_diff = 0.0f;
+        heading_pid_reset();
+        target_speed_1 = 0.0f;
+        target_speed_2 = 0.0f;
+        huidu_steer_correction = 0.0f;
         return;
     }
 
-    offset_level = (uint8_t)
-        ((applied_gear < 0) ? -applied_gear : applied_gear);
-    outer_speed = huidu_get_outer_speed(offset_level);
+    /*
+     * 八路全白可能是黑线位于中心间隙，也可能是严重偏移后刚越线。
+     * 若上一周期差速较大，保持原运动状态并暂停航向 PID，
+     * 直到探头重新看到黑线。
+     */
+    if (black_count == 0U) {
+        abs_diff = (s_prev_track_diff < 0.0f) ?
+            -s_prev_track_diff : s_prev_track_diff;
+        if (abs_diff > TRACK_HOLD_THRESHOLD) {
+            heading_pid_pause();
+            return;
+        }
 
-    if (applied_gear < 0) {
-        /* 黑线偏左：右轮为外侧轮。 */
-        huidu_set_staircase_command(
-            outer_speed, TRACK_INNER_SPEED, applied_gear);
-    } else {
-        /* 黑线偏右：左轮为外侧轮。 */
-        huidu_set_staircase_command(
-            TRACK_INNER_SPEED, outer_speed, applied_gear);
+        huidu_line_error = 0.0f;
+        s_line_error_filtered = 0.0f;
+        s_prev_line_error = 0.0f;
+        s_prev_track_diff = 0.0f;
+        heading_correction = heading_pid_update(0, TRACK_CENTER_SPEED);
+        target_speed_1 = TRACK_CENTER_SPEED - heading_correction;
+        target_speed_2 = TRACK_CENTER_SPEED + heading_correction;
+        huidu_steer_correction = heading_correction;
+        return;
     }
+
+    /* 计算黑线重心偏移量。 */
+    huidu_line_error =
+        (float) weighted_error / (float) black_count;
+
+    /* 低通滤波抑制传感器瞬时抖动。 */
+    s_line_error_filtered =
+        TRACK_LPF_ALPHA * huidu_line_error +
+        (1.0f - TRACK_LPF_ALPHA) * s_line_error_filtered;
+
+    /* 连续 PD：差速 = P(比例) + D(微分阻尼)。 */
+    {
+        float line_delta = s_line_error_filtered - s_prev_line_error;
+        s_prev_line_error = s_line_error_filtered;
+
+        track_diff =
+            TRACK_PD_KP * s_line_error_filtered +
+            TRACK_PD_KD * line_delta;
+    }
+
+    /* 限幅到允许的最大差速范围。 */
+    if (track_diff > TRACK_MAX_DIFF) {
+        track_diff = TRACK_MAX_DIFF;
+    } else if (track_diff < -TRACK_MAX_DIFF) {
+        track_diff = -TRACK_MAX_DIFF;
+    }
+
+    s_prev_track_diff = track_diff;
+
+    /*
+     * 将连续差速映射为虚拟档位，供 heading_pid_update 进行
+     * 入弯/出弯模式切换。该档位仅对航向 PID 可见，不影响实际差速。
+     */
+    abs_diff = (track_diff < 0.0f) ? -track_diff : track_diff;
+    if (abs_diff < TRACK_VGEAR_DEADBAND) {
+        virtual_gear = 0;
+    } else if (abs_diff < TRACK_VGEAR_LEVEL_2) {
+        virtual_gear = 1;
+    } else if (abs_diff < TRACK_VGEAR_LEVEL_3) {
+        virtual_gear = 2;
+    } else if (abs_diff < TRACK_VGEAR_LEVEL_4) {
+        virtual_gear = 3;
+    } else {
+        virtual_gear = 4;
+    }
+    if (track_diff < 0.0f) {
+        virtual_gear = -virtual_gear;
+    }
+
+    /* MPU6050 航向 PID 修正。 */
+    heading_correction = heading_pid_update(
+        virtual_gear, TRACK_CENTER_SPEED);
+
+    /*
+     * 融合：中心速度 ± 循迹差速的一半 ± 航向修正。
+     *
+     *   - track_diff 正 = 线在右 = 需右转 = 左轮加速
+     *   - heading_correction 正 = 顺时针 = 左轮加速
+     *   - 右轮目标 = target_speed_1，左轮目标 = target_speed_2
+     */
+    left_speed  = TRACK_CENTER_SPEED + track_diff * 0.5f +
+                  heading_correction;
+    right_speed = TRACK_CENTER_SPEED - track_diff * 0.5f -
+                  heading_correction;
+
+    /* 安全限幅：禁止负速和超速。 */
+    if (left_speed < 0.0f) {
+        left_speed = 0.0f;
+    } else if (left_speed > TRACK_TARGET_SPEED_MAX) {
+        left_speed = TRACK_TARGET_SPEED_MAX;
+    }
+    if (right_speed < 0.0f) {
+        right_speed = 0.0f;
+    } else if (right_speed > TRACK_TARGET_SPEED_MAX) {
+        right_speed = TRACK_TARGET_SPEED_MAX;
+    }
+
+    target_speed_1 = right_speed;
+    target_speed_2 = left_speed;
+    huidu_steer_correction = (left_speed - right_speed) * 0.5f;
 }
 
 /**
@@ -259,74 +239,7 @@ void huidu_get_value(void)
 }
 
 /**
- * 执行四档阶梯差速，并在正常可见状态下叠加新的 MPU6050 航向 PID。
- */
-static void huidu_adjust_staircase(
-    int16_t weighted_error, uint8_t black_count)
-{
-    uint16_t error_magnitude;
-    uint8_t offset_level;
-    int8_t requested_gear;
-    int8_t applied_gear;
-
-    /* 八路全黑无法判断黑线中心，立即停车并清除全部控制历史。 */
-    if (black_count == HUIDU_SENSOR_COUNT) {
-        huidu_line_error = 0.0f;
-        huidu_reset_gear_debounce(0);
-        heading_pid_reset();
-        huidu_set_staircase_command(0.0f, 0.0f, 0);
-        return;
-    }
-
-    /*
-     * 八路全白可能是黑线位于中心间隙，也可能是严重偏移后刚越线。
-     * 若上一状态是第 4 档，则保持原左右轮目标，直到探头重新看到黑线。
-     * 暂停航向 PID 只同步内部目标，不改变已经下发的电机运动状态。
-     */
-    if (black_count == 0U) {
-        if (s_last_offset_level == TRACK_MAX_OFFSET_LEVEL) {
-            huidu_cancel_pending_gear();
-            heading_pid_pause();
-            return;
-        }
-
-        huidu_line_error = 0.0f;
-        huidu_reset_gear_debounce(0);
-        huidu_set_staircase_command(
-            TRACK_STRAIGHT_SPEED, TRACK_STRAIGHT_SPEED, 0);
-        return;
-    }
-
-    huidu_line_error =
-        (float) weighted_error / (float) black_count;
-
-    if (weighted_error == 0) {
-        requested_gear = 0;
-    } else {
-        error_magnitude = (uint16_t)
-            ((weighted_error < 0) ? -weighted_error : weighted_error);
-        if (heading_pid_get_mode() == HEADING_MODE_STRAIGHT &&
-            s_applied_gear == 0 && black_count >= 2U &&
-            error_magnitude <= (uint16_t)(black_count + (black_count >> 1))) {
-            requested_gear = 0;
-        } else {
-            offset_level = huidu_select_offset_level(
-                error_magnitude, black_count);
-            requested_gear = (weighted_error < 0) ?
-                -(int8_t) offset_level : (int8_t) offset_level;
-        }
-    }
-
-    /*
-     * 只有同一带方向档位连续出现 TRACK_GEAR_CONFIRM_TICKS 次才切换；
-     * 确认期间继续使用原档位，避免相邻探头抖动造成左右反复跳变。
-     */
-    applied_gear = huidu_confirm_staircase_gear(requested_gear);
-    huidu_apply_staircase_gear(applied_gear);
-}
-
-/**
- * 读取传感器，先生成防抖阶梯差速，再叠加 MPU6050 航向 PID。
+ * 读取传感器，计算黑线重心，执行连续循迹 PD + 航向 PID 融合。
  */
 void adjust_motor(void)
 {
@@ -347,5 +260,5 @@ void adjust_motor(void)
         }
     }
 
-    huidu_adjust_staircase(weighted_error, black_count);
+    huidu_tracking_pd(weighted_error, black_count);
 }
