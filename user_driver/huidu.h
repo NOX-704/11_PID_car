@@ -4,9 +4,10 @@
 #include <stdint.h>
 
 /*
- * 八路循迹探头从车体左到右排列：
+ * PCB 八路循迹网络的引脚：
  * L1=PA18, L2=PA16, L3=PB7, L4=PA17,
  * R1=PA21, R2=PA22, R3=PA24, R4=PA2。
+ * 实车模块方向相反，huidu_get_value() 会镜像成车体从左到右顺序。
  */
 #define HUIDU_SENSOR_COUNT (8U)
 
@@ -17,14 +18,14 @@
  */
 extern volatile uint8_t huidu_value[HUIDU_SENSOR_COUNT];
 
-/* CCS 调参观察量：滤波后的黑线横向误差和当前左右轮差速修正。 */
+/* CCS 观察量：黑线横向误差和当前左右轮差速修正。 */
 extern volatile float huidu_line_error;
 extern volatile float huidu_steer_correction;
 
 /* 镜像读取八路 GPIO，并按车体从左到右更新黑线检测状态。 */
 void huidu_get_value(void);
 
-/* 根据八路黑线重心执行连续转向 PID，并更新两路电机目标速度。 */
+/* 根据八路黑线重心执行当前选择的阶梯/PID控制并更新目标速度。 */
 void adjust_motor(void);
 
 #endif
